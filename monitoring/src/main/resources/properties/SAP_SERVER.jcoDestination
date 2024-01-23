@@ -1,0 +1,10 @@
+#for CubeOneJcoServer
+#Fri Apr 11 17:16:11 KST 2014
+jco.client.lang=en
+jco.destination.peak_limit=90
+jco.client.client=000
+jco.client.passwd=Thqpxpr2023@
+jco.client.sysnr=54
+jco.client.user=SBT172
+jco.destination.pool_capacity=99
+jco.client.ashost=59.13.7.245

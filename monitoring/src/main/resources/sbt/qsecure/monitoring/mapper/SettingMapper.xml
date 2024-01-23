@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "HTTP://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="sbt.qsecure.monitoring.mapper.SettingMapper">
+	<select id="getConvExitList"
+	resultType="sbt.qsecure.monitoring.vo.ConvExitVO">
+	SELECT *
+	FROM CONVEXIT
+	</select>
+	
+	<select id="getCommonSettingList"
+	resultType="sbt.qsecure.monitoring.vo.CommonSettingVO">
+	SELECT *
+	FROM COMMONSETTING
+	WHERE
+	SYSTEM = 'prd'
+	</select>
+
+</mapper>
