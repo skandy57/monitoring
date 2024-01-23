@@ -1,6 +1,8 @@
 package sbt.qsecure.monitoring.controller;
 
 import java.lang.ProcessHandle.Info;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 
@@ -15,6 +17,9 @@ import lombok.extern.slf4j.Slf4j;
 import sbt.qsecure.monitoring.constant.Server;
 import sbt.qsecure.monitoring.os.LinuxConnector;
 import sbt.qsecure.monitoring.service.ServerService;
+import sbt.qsecure.monitoring.service.SettingService;
+import sbt.qsecure.monitoring.vo.CommonSettingVO;
+import sbt.qsecure.monitoring.vo.ConvExitVO;
 import sbt.qsecure.monitoring.vo.ServerVO;
 
 @Slf4j
@@ -23,6 +28,7 @@ import sbt.qsecure.monitoring.vo.ServerVO;
 public class MainController {
 
 	private final ServerService serverService;
+	private final SettingService settingService;
 
 	@GetMapping("/main")
 	public String main(Model model, HttpSession session) {
@@ -40,9 +46,22 @@ public class MainController {
 
 		List<ServerVO> securityServerList = serverService.getServerList(Server.SECURITY);
 		model.addAttribute("securityServerList", securityServerList);
+		
+//		ServerVO testServer = aiServerList.get(0);
+		List<CommonSettingVO> settings = settingService.getCommonSettingList();
+//		CommonSettingVO setting = settings.get(0);
+		List<ConvExitVO> convs = settingService.getConvExitList();
+//		ConvExitVO conv = convs.get(0);
+		
+		LocalDate currentDate = LocalDate.now();
 
-		ServerVO testServer = aiServerList.get(0);
-		LinuxConnector linux = new LinuxConnector(testServer);
+		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+
+		for (int i = 11; i >= 0; i--) {
+			LocalDate date = currentDate.minusDays(i);
+			String formattedDate = date.format(formatter);
+
+		}
 
 		return "main";
 
