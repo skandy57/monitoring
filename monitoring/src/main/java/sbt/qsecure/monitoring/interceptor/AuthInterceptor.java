@@ -12,51 +12,52 @@ import sbt.qsecure.monitoring.constant.Auth.AuthGrade;
 
 //import sbt.qsecure.monitoring.interceptor.Auth.Role;
 
-
 @RequiredArgsConstructor
 @Component
-public class AuthInterceptor implements HandlerInterceptor{
-	
-	  @Override
-	    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
-	            throws Exception {
-	        if (handler instanceof HandlerMethod) {
-	            HandlerMethod handlerMethod = (HandlerMethod) handler;
-	            Auth auth = handlerMethod.getMethodAnnotation(Auth.class);
+public class AuthInterceptor implements HandlerInterceptor {
 
-	            if (auth != null) {
-	            	AuthGrade requiredAuth = auth.authGrade();
-	            	
-	            	if (request.getSession().getAttribute("authGrade")==AuthGrade.NOT_LOGIN){
-	            		response.sendError(HttpServletResponse.SC_FORBIDDEN, "로그인을 해주세요");
-	            	}
-						
-					
-	                if (!checkAuth(request, requiredAuth)) {
-	                	response.sendError(HttpServletResponse.SC_FORBIDDEN, "권한이 없습니다");
-						return false;
-					}
-	            }
-	        }
-	        return true; 
-	    }
+	/**
+	* 메소드 실행 권한과 접속한 유저의 권한을 비교하여 boolean을 반환한다
+	*/
+	@Override
+	public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
+			throws Exception {
+		if (handler instanceof HandlerMethod) {
+			HandlerMethod handlerMethod = (HandlerMethod) handler;
+			Auth auth = handlerMethod.getMethodAnnotation(Auth.class);
 
-	    @Override
-	    public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler,
-	            ModelAndView modelAndView) throws Exception {
+			if (auth != null) {
+				AuthGrade requiredAuth = auth.authGrade();
 
-	    }
+				if (request.getSession().getAttribute("authGrade") == AuthGrade.NOT_LOGIN) {
+					response.sendError(HttpServletResponse.SC_FORBIDDEN, "로그인을 해주세요");
+				}
 
-	    @Override
-	    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex)
-	            throws Exception {
+				if (!checkAuth(request, requiredAuth)) {
+					response.sendError(HttpServletResponse.SC_FORBIDDEN, "권한이 없습니다");
+					return false;
+				}
+			}
+		}
+		return true;
+	}
 
-	    }
-	
-	    private boolean checkAuth(HttpServletRequest request, AuthGrade requiredAuth) {
-	        AuthGrade userAuth = (AuthGrade) request.getSession().getAttribute("authGrade");
+	@Override
+	public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler,
+			ModelAndView modelAndView) throws Exception {
 
-	        return userAuth != null && userAuth == requiredAuth;
-	    }
-	
+	}
+
+	@Override
+	public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex)
+			throws Exception {
+
+	}
+
+	private boolean checkAuth(HttpServletRequest request, AuthGrade requiredAuth) {
+		AuthGrade userAuth = (AuthGrade) request.getSession().getAttribute("authGrade");
+
+		return userAuth != null && userAuth == requiredAuth;
+	}
+
 }

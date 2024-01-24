@@ -7,6 +7,9 @@ import lombok.RequiredArgsConstructor;
 public enum Result {
 
 	SUCCESS,
+	ERR_SAP,
+	ERR_AIDB,
+	ERR_MODULE,
 	ERR_UNKNOWN_HOSTKEY,
 	ERR_INVALID_PRIVATEKEY,
 	ERR_AUTH_CANCEL,

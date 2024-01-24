@@ -95,10 +95,9 @@ public class LinuxController {
 	@ResponseBody
 	@GetMapping("/getDiskUsage")
 	public String getDiskUsage() throws Exception {
-		List<ServerVO> aiServerList = serverService.getServerList(Server.AI);
+		ServerVO aiServer = serverService.getServerList(Server.AI).get(0);
 
-		ServerVO testServer = aiServerList.get(0);
-		LinuxConnector linux = new LinuxConnector(testServer);
+		LinuxConnector linux = new LinuxConnector(aiServer);
 		
 		String diskUsage = linux.sendCommand("source .bash_profile;df -h $COHOME | awk 'NR==2 {print $5}'");
 		log.info(diskUsage);
@@ -106,12 +105,16 @@ public class LinuxController {
 		
 		
 	}
-//	
-//	@ResponseBody
-//	@GetMapping("/cotest")
-//	public String cotest() {
-//		return null;
-//		
-//	}
-//	
+	
+	@ResponseBody
+	@GetMapping("/cotest")
+	public String cotest() {
+		
+		ServerVO aiServer = serverService.getServerList(Server.AI).get(0);
+		
+		
+		return null;
+		
+	}
+	
 }

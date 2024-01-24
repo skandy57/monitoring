@@ -37,7 +37,7 @@ public class ServerServiceImpl implements ServerService {
 	private final CommandMapper commandMapper;
 
 	/**
-	 * 서버 유형에 따라 서버 목록을 반환합니다.
+	 * 서버 유형에 따라 서버 목록을 반환한다.
 	 *
 	 * @param serverType 서버 유형(A/I Server, Security Server, Manager Server)
 	 * @return 서버 목록
@@ -49,7 +49,7 @@ public class ServerServiceImpl implements ServerService {
 	}
 
 	/**
-	 * 서버의 상세 정보를 JSON 형식으로 반환합니다.
+	 * 서버의 상세 정보를 JSON 형식으로 반환한다.
 	 *
 	 * @param server 서버 정보
 	 * @return JSON 형식의 서버 상세 정보
@@ -299,18 +299,24 @@ public class ServerServiceImpl implements ServerService {
 	}
 
 	@Override
-	public JSONObject readEncLog(ServerVO vo, AiServerSettingVO ai) {
-		// TODO Auto-generated method stub
-		return null;
-	}
-
-	@Override
-	public JSONObject readEventLog(ServerVO vo, AiServerSettingVO ai) {
+	public JSONObject readEncLog(ServerVO vo, String directory, String date, String sid, String conv) {
 		// TODO Auto-generated method stub
 		return null;
 	}
 	/**
-	 * enc_event_log의 ERROR건 수를 반환합니다.
+	 * event_log를 서버에서 읽어 List형태의 JSON으로 파싱하여 반환한다.
+	 *
+	 * @param server 서버 정보
+	 * @param directory event_log의 디렉토리
+	 * @return List형태의 event_log JSON 
+	 */
+	@Override
+	public JSONObject readEventLog(ServerVO vo, String directory) {
+		// TODO Auto-generated method stub
+		return null;
+	}
+	/**
+	 * enc_event_log의 암호화 ERROR건 수를 반환한다.
 	 *
 	 * @param server 서버 정보
 	 * @param directory enc_event_log의 디렉토리
@@ -320,7 +326,7 @@ public class ServerServiceImpl implements ServerService {
 	 * @return enc_event_log의 암호화 중 ERROR 건 수 
 	 */
 	@Override
-	public int getCountEncError(ServerVO server, String directory, String date, String sid, String conv) {
+	public String getCountEncError(ServerVO server, String directory, String date, String sid, String conv) {
 		String result = null;
 		OSConnector osConnector = getOSConnector(server);
 		if (osConnector != null) {
@@ -332,13 +338,13 @@ public class ServerServiceImpl implements ServerService {
 				 log.info("source .bash_profile;grep -c '[ERROR]' $COHOME"+directory+"/"+date+"_"+sid+"_ENC_"+conv+"*");
 			} catch (Exception e) {
 				log.error("Error Counting Error Enc.", e);
-				return 1;
+				return null;
 			}
 		}
-		return Integer.parseInt(result);
+		return result;
 	}
 	/**
-	 * enc_event_log의 ERROR건 수를 반환합니다.
+	 * enc_event_log의 복호화 ERROR건 수를 반환한다.
 	 *
 	 * @param server 서버 정보
 	 * @param directory enc_event_log의 디렉토리
@@ -348,7 +354,7 @@ public class ServerServiceImpl implements ServerService {
 	 * @return enc_event_log의 복호화 중 ERROR 건 수 
 	 */
 	@Override
-	public int getCountDecError(ServerVO server, String directory, String date, String sid, String conv) {
+	public String getCountDecError(ServerVO server, String directory, String date, String sid, String conv) {
 		String result = null;
 		OSConnector osConnector = getOSConnector(server);
 		if (osConnector != null) {
@@ -360,14 +366,14 @@ public class ServerServiceImpl implements ServerService {
 				 log.info("source .bash_profile;grep -c '[ERROR]' $COHOME"+directory+"/"+date+"_"+sid+"_DEC_"+conv+"*");
 			} catch (Exception e) {
 				log.error("Error Counting Error Enc.", e);
-				return 1;
+				return null;
 			}
 		}
-		return Integer.parseInt(result);
+		return result;
 	}
-
+	
 	/**
-	 * OSConnector를 반환합니다.
+	 * 서버의 Os를 받아 알맞는 OS의 Connector를 반환한다.
 	 *
 	 * @param server 서버 정보
 	 * @return OSConnector 인스턴스
@@ -378,6 +384,12 @@ public class ServerServiceImpl implements ServerService {
 		} else if (server.serverOs().contains(OperationSystem.LINUX.getOs())) {
 			return new LinuxConnector(server);
 		}
+		return null;
+	}
+
+	@Override
+	public Result cotest(ServerVO server, String instance) {
+		// TODO Auto-generated method stub
 		return null;
 	}
 }

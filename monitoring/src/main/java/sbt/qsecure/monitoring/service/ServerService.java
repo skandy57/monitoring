@@ -30,15 +30,16 @@ public interface ServerService {
 	public Result stopCubeOneInstance(ServerVO server, MemberVO member, AiServerSettingVO ai);
 	public Result startCubeOneModule(ServerVO server, MemberVO member, AiServerSettingVO ai);
 	public Result stopCubeOneModule(ServerVO server, MemberVO member, AiServerSettingVO ai);
+	public Result cotest(ServerVO server, String instance); 
 	public JSONObject getTop();
 	public List<CommandVO> getAllCommand(ServerVO vos);
 	public JSONObject getCpuUsage(ServerVO vo);
 	public JSONObject getMemoryUsage(ServerVO vo);
 	public JSONObject getDiskUsage(ServerVO vo);
 	public JSONObject getProcess(ServerVO vo);
-	public JSONObject readEncLog(ServerVO vo, AiServerSettingVO ai);
-	public JSONObject readEventLog(ServerVO vo, AiServerSettingVO ai);
+	public JSONObject readEncLog(ServerVO vo, String directory, String date, String sid, String conv);
+	public JSONObject readEventLog(ServerVO vo, String directory);
 
-	public int getCountDecError(ServerVO server, String directory, String date, String sid, String conv);
-	public int getCountEncError(ServerVO server, String directory, String date, String sid, String conv);
+	public String getCountDecError(ServerVO server, String directory, String date, String sid, String conv);
+	public String getCountEncError(ServerVO server, String directory, String date, String sid, String conv);
 }

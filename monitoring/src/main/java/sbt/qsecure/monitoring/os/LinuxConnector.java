@@ -31,6 +31,12 @@ import sbt.qsecure.monitoring.vo.ServerVO;
 import sbt.qsecure.monitoring.vo.TerminalConnectionVO;
 import sbt.qsecure.monitoring.vo.TerminalVO;
 
+/**
+ * 
+ */
+/**
+ * 
+ */
 @Slf4j
 public class LinuxConnector implements OSConnector{
 
@@ -73,6 +79,11 @@ public class LinuxConnector implements OSConnector{
 		jsch = new JSch();
 	}
 
+	/**
+	 * WAS와 A/I서버간 연결 가능 여부를 반환한다.
+	 * 
+	 * @return WAS <-> A/I 서버 연결 여부
+	 */
 	public boolean isConnected() {
 
 		try {
@@ -92,6 +103,11 @@ public class LinuxConnector implements OSConnector{
 		return session.isConnected();
 	}
 
+	/**
+	 * WAS와 A/I서버와 세션을 연결한다.
+	 * 
+	 * 추후 setConfig에서 HostKeyChecking을 해야함
+	 */
 	public void connect() {
 		try {
 			session = jsch.getSession(userId.trim(), host.trim(), port);
@@ -102,6 +118,16 @@ public class LinuxConnector implements OSConnector{
 			log.error("SSH 연결 실패", e);
 		}
 	}
+	
+	
+	/**
+	 * A/I서버로 명령어를 던진다.
+	 *@param command A/I서버로 던질 명령어
+	 *@return 명령어의 결과값
+	 *@exception JSchException 세션 및 채널통신 간 예외
+	 *@exception IOException 명령어를 실행 중 or 결과값을 리턴받는 과정에서의 입출력 예외
+	 *
+	 */
 	@Override
 	public String sendCommand(String command) throws Exception {
 		connect();
@@ -134,6 +160,9 @@ public class LinuxConnector implements OSConnector{
 
 	}
 
+	/**
+	 * WAS <-> A/I 간 세션 및 채널의 연결을 해제한다.
+	 */
 	public void disconnect() {
 		if (session != null || session.isConnected()) {
 			session.disconnect();
@@ -143,6 +172,11 @@ public class LinuxConnector implements OSConnector{
 		}
 	}
 
+	/**
+	 * WAS <-> A/I 간 WebSocket을 연결한다
+	 * @param webSession WebSocket 세션
+	 * @param vo WebSocket간 필요한 정보
+	 */
 	public void connectTerminal(WebSocketSession webSession, TerminalVO vo) {
 		TerminalConnectionVO connection = new TerminalConnectionVO();
 		connection.setJsch(jsch);

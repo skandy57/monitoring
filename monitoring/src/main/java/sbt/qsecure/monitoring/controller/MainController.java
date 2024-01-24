@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.IntStream;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -46,22 +47,43 @@ public class MainController {
 
 		List<ServerVO> securityServerList = serverService.getServerList(Server.SECURITY);
 		model.addAttribute("securityServerList", securityServerList);
-		
+
 //		ServerVO testServer = aiServerList.get(0);
 		List<CommonSettingVO> settings = settingService.getCommonSettingList();
 //		CommonSettingVO setting = settings.get(0);
 		List<ConvExitVO> convs = settingService.getConvExitList();
 //		ConvExitVO conv = convs.get(0);
+
+//		LocalDate currentDate = LocalDate.now();
+//
+//		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+//
+//		for (int i = 11; i >= 0; i--) {
+//			LocalDate date = currentDate.minusDays(i);
+//			String formattedDate = date.format(formatter);
+//
+//		}
+		 LocalDate currentDate = LocalDate.now();
+		    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+
+		    for (ServerVO server : aiServerList) {
+		        for (CommonSettingVO setting : settings) {
+		            for (ConvExitVO conv : convs) {
+		                for (int i = 11; i >= 0; i--) {
+		                    LocalDate date = currentDate.minusDays(i);
+		                    String formattedDate = date.format(formatter);
+
+		                    // getCountEncError 메소드 호출
+		                    String errorCount = serverService.getCountEncError(server, setting.encLogDirectory(), formattedDate, setting.sid(), conv.conversionExit());
+
+		                    // 여기에서 errorCount를 적절하게 활용할 수 있음
+		                    // 예: 로그에 출력 또는 모델에 추가 등
+		                    log.info("Error count for server {} with setting {} and conv {}: {}", server.host(), setting.encLogDirectory(), conv.conversionExit(), errorCount);
+		                }
+		            }
+		        }
+		    }
 		
-		LocalDate currentDate = LocalDate.now();
-
-		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
-
-		for (int i = 11; i >= 0; i--) {
-			LocalDate date = currentDate.minusDays(i);
-			String formattedDate = date.format(formatter);
-
-		}
 
 		return "main";
 
