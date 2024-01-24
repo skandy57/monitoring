@@ -40,6 +40,6 @@ public interface ServerService {
 	public JSONObject readEncLog(ServerVO vo, String directory, String date, String sid, String conv);
 	public JSONObject readEventLog(ServerVO vo, String directory);
 
-	public String getCountDecError(ServerVO server, String directory, String date, String sid, String conv);
-	public String getCountEncError(ServerVO server, String directory, String date, String sid, String conv);
+	public String getCountDecError(ServerVO server, String directory, String date, String sid);
+	public String getCountEncError(ServerVO server, String directory, String date, String sid);
 }

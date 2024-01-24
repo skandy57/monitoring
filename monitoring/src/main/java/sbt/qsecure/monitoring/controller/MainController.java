@@ -74,7 +74,7 @@ public class MainController {
 		                    String formattedDate = date.format(formatter);
 
 		                    // getCountEncError 메소드 호출
-		                    String errorCount = serverService.getCountEncError(server, setting.encLogDirectory(), formattedDate, setting.sid(), conv.conversionExit());
+		                    String errorCount = serverService.getCountEncError(server, setting.encLogDirectory(), formattedDate, setting.sid());
 
 		                    // 여기에서 errorCount를 적절하게 활용할 수 있음
 		                    // 예: 로그에 출력 또는 모델에 추가 등

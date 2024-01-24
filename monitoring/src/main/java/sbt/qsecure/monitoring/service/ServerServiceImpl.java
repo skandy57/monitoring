@@ -303,39 +303,42 @@ public class ServerServiceImpl implements ServerService {
 		// TODO Auto-generated method stub
 		return null;
 	}
+
 	/**
 	 * event_log를 서버에서 읽어 List형태의 JSON으로 파싱하여 반환한다.
 	 *
-	 * @param server 서버 정보
+	 * @param server    서버 정보
 	 * @param directory event_log의 디렉토리
-	 * @return List형태의 event_log JSON 
+	 * @return List형태의 event_log JSON
 	 */
 	@Override
 	public JSONObject readEventLog(ServerVO vo, String directory) {
 		// TODO Auto-generated method stub
 		return null;
 	}
+
 	/**
 	 * enc_event_log의 암호화 ERROR건 수를 반환한다.
 	 *
-	 * @param server 서버 정보
+	 * @param server    서버 정보
 	 * @param directory enc_event_log의 디렉토리
-	 * @param date enc_event_log의 날짜
-	 * @param sid 암호화를 실행한 SAP SID
-	 * @param conv 암호화 Conv.exit
-	 * @return enc_event_log의 암호화 중 ERROR 건 수 
+	 * @param date      enc_event_log의 날짜
+	 * @param sid       암호화를 실행한 SAP SID
+	 * @param conv      암호화 Conv.exit
+	 * @return enc_event_log의 암호화 중 ERROR 건 수
 	 */
 	@Override
-	public String getCountEncError(ServerVO server, String directory, String date, String sid, String conv) {
+	public String getCountEncError(ServerVO server, String directory, String date, String sid) {
 		String result = null;
 		OSConnector osConnector = getOSConnector(server);
 		if (osConnector != null) {
 			try {
-				 result = osConnector.sendCommand("source .bash_profile;grep -c '[ERROR]' $COHOME"+directory+"/"+date+ "_" + sid + "_ENC_" + conv + "*");
-				 if (result.isBlank()) {
+				result = osConnector.sendCommand("source .bash_profile;grep -c '[ERROR]' $COHOME" + directory + "/"
+						+ date + "_" + sid + "_ENC_* | awk -F: '{sum += $NF}END {print sum}'");
+				if (result.isBlank()) {
 					result = "0";
 				}
-				 log.info("source .bash_profile;grep -c '[ERROR]' $COHOME"+directory+"/"+date+"_"+sid+"_ENC_"+conv+"*");
+				log.info("source .bash_profile;grep -c '[ERROR]' $COHOME" + directory + "/" + date + "_" + sid + "_ENC_* | awk -F: '{sum += $NF}END {print sum}'");
 			} catch (Exception e) {
 				log.error("Error Counting Error Enc.", e);
 				return null;
@@ -343,27 +346,29 @@ public class ServerServiceImpl implements ServerService {
 		}
 		return result;
 	}
+
 	/**
 	 * enc_event_log의 복호화 ERROR건 수를 반환한다.
 	 *
-	 * @param server 서버 정보
+	 * @param server    서버 정보
 	 * @param directory enc_event_log의 디렉토리
-	 * @param date enc_event_log의 날짜
-	 * @param sid 복호화를 실행한 SAP SID
-	 * @param conv 복호화 Conv.exit
-	 * @return enc_event_log의 복호화 중 ERROR 건 수 
+	 * @param date      enc_event_log의 날짜
+	 * @param sid       복호화를 실행한 SAP SID
+	 * @param conv      복호화 Conv.exit
+	 * @return enc_event_log의 복호화 중 ERROR 건 수
 	 */
 	@Override
-	public String getCountDecError(ServerVO server, String directory, String date, String sid, String conv) {
+	public String getCountDecError(ServerVO server, String directory, String date, String sid) {
 		String result = null;
 		OSConnector osConnector = getOSConnector(server);
 		if (osConnector != null) {
 			try {
-				 result = osConnector.sendCommand("source .bash_profile;grep -c '[ERROR]' $COHOME"+directory+"/"+date+ "_" + sid + "_ENC_" + conv + "*");
-				 if (result.isBlank()) {
+				result = osConnector.sendCommand("source .bash_profile;grep -c '[ERROR]' $COHOME" + directory + "/"
+						+ date + "_" + sid + "_ENC_*");
+				if (result.isBlank()) {
 					result = "0";
 				}
-				 log.info("source .bash_profile;grep -c '[ERROR]' $COHOME"+directory+"/"+date+"_"+sid+"_DEC_"+conv+"*");
+				log.info("source .bash_profile;grep -c '[ERROR]' $COHOME" + directory + "/" + date + "_" + sid + "_DEC_* | awk -f; '{sum += $NF}END {print sum}'");
 			} catch (Exception e) {
 				log.error("Error Counting Error Enc.", e);
 				return null;
@@ -371,7 +376,7 @@ public class ServerServiceImpl implements ServerService {
 		}
 		return result;
 	}
-	
+
 	/**
 	 * 서버의 Os를 받아 알맞는 OS의 Connector를 반환한다.
 	 *
@@ -389,7 +394,59 @@ public class ServerServiceImpl implements ServerService {
 
 	@Override
 	public Result cotest(ServerVO server, String instance) {
-		// TODO Auto-generated method stub
+		OSConnector osConnector = getOSConnector(server);
+		String result = null;
+
+		if (osConnector != null) {
+			switch (server.version()) {
+			case "NEW":
+				try {
+					result = osConnector
+							.sendCommand("source .bash_profile;$COHOME/aisvr/jco_" + instance + "/cotest.sh check");
+				} catch (Exception e) {
+					log.error("Error cotest.", e);
+					return null;
+				}
+			case "OLD":
+				String[] checks = { "enc", "sap", "db" };
+				for (String type : checks) {
+					try {
+						result = osConnector.sendCommand(
+								"source .bash_profile;$COHOME/JCOCubeOneServer/JCO" + instance + "/cotest.sh " + type);
+
+						if (result != null) {
+							if (result.contains("ok")) {
+								continue;
+							} else if (result.contains("failed") || result.isBlank()) {
+								if ("db".equals(type)) {
+									result = osConnector.sendCommand("source .bash_profile;$COHOME/JCOCubeOneServer/JCO"
+											+ instance + "/cotest.sh ora");
+
+									if (result != null && (result.contains("ok") || result.isBlank())) {
+										return Result.SUCCESS;
+									} else {
+										return Result.ERR_AIDB;
+									}
+								} else {
+									return switch (type) {
+									case "enc" -> Result.ERR_MODULE;
+									case "sap" -> Result.ERR_SAP;
+									default -> null;
+									};
+								}
+							}
+						}
+
+					} catch (Exception e) {
+						log.error("cotest 실행 중 오류 발생.", e);
+						return null;
+					}
+				}
+				break;
+			}
+
+		}
+
 		return null;
 	}
 }

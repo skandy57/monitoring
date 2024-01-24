@@ -1,5 +1,7 @@
 package sbt.qsecure.monitoring;
 
+import static org.mockito.ArgumentMatchers.contains;
+
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
 import java.sql.SQLException;
@@ -79,9 +81,8 @@ public class DbTest {
 		String dir = setting.encLogDirectory();
 		String sid = setting.sid();
 		log.info(sid);
-		String convertion = conv.conversionExit();
 
-		String result = serverService.getCountEncError(server, dir, "20230906", sid, "ZBAN2");
+		String result = serverService.getCountEncError(server, dir, "20230906", sid);
 
 		System.out.println("result: " + result);
 
@@ -104,12 +105,11 @@ public class DbTest {
 					for (int i = 11; i >= 0; i--) {
 						LocalDate date = currentDate.minusDays(i);
 						String formattedDate = date.format(formatter);
-
 						String errorCount = serverService.getCountEncError(testServer, setting.encLogDirectory()+"/",
-								formattedDate, setting.sid(), conv.conversionExit());
+								formattedDate, setting.sid());
 
-						log.info("Error count for server {} with setting {} and conv {}: {}", testServer.host(),
-								setting.encLogDirectory(), conv.conversionExit(), errorCount);
+						log.info( testServer.host() + " count "+i+" "+
+								setting.encLogDirectory()+"  "+conv.conversionExit()+" "+ errorCount);
 					}
 				}
 			}

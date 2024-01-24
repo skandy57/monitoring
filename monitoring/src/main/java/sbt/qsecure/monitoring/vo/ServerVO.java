@@ -13,5 +13,6 @@ public record ServerVO(
 		String passwd,
 		int port,
 		String serverOs,
-		Server serverType )
+		Server serverType,
+		String version)
 {}
