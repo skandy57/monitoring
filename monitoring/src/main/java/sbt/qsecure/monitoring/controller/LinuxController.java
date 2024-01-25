@@ -69,7 +69,7 @@ public class LinuxController {
 		return Double.parseDouble(cpuUsage);
 
 	}
-	
+
 	@ResponseBody
 	@GetMapping("/getMemoryUsage")
 	public double getMemoryUsage() throws Exception {
@@ -77,11 +77,11 @@ public class LinuxController {
 
 		ServerVO testServer = aiServerList.get(0);
 		LinuxConnector linux = new LinuxConnector(testServer);
-		
+
 		String memoryUsage = linux.sendCommand("free | awk '/Mem:/ {used = $2 - $4 - $6; print used / $2 * 100}'");
-		
-		return (Math.round(Double.parseDouble(memoryUsage)*100)/100.0);
-		
+
+		return (Math.round(Double.parseDouble(memoryUsage) * 100) / 100.0);
+
 	}
 //	
 //	@ResponseBody
@@ -95,26 +95,29 @@ public class LinuxController {
 	@ResponseBody
 	@GetMapping("/getDiskUsage")
 	public String getDiskUsage() throws Exception {
-		ServerVO aiServer = serverService.getServerList(Server.AI).get(0);
+		int totalDiskUsage = 0;
+		int serverCount = 0;
 
-		LinuxConnector linux = new LinuxConnector(aiServer);
-		
-		String diskUsage = linux.sendCommand("source .bash_profile;df -h $COHOME | awk 'NR==2 {print $5}'");
-		log.info(diskUsage);
-		return diskUsage;
-		
-		
+		List<ServerVO> aiServers = serverService.getServerList(Server.AI);
+
+		for (ServerVO aiServer : aiServers) {
+			totalDiskUsage += Integer.parseInt(serverService.getDiskUsage(aiServer));
+			serverCount++;
+		}
+
+		double averageDiskUsage = (serverCount != 0) ? ((double) totalDiskUsage / serverCount) : 0.0;
+
+		return Double.toString(averageDiskUsage);
 	}
-	
+
 	@ResponseBody
 	@GetMapping("/cotest")
 	public String cotest() {
-		
+
 		ServerVO aiServer = serverService.getServerList(Server.AI).get(0);
-		
-		
+
 		return null;
-		
+
 	}
-	
+
 }

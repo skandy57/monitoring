@@ -5,6 +5,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import org.apache.ibatis.annotations.Param;
+import org.hamcrest.text.IsBlankString;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
@@ -24,6 +25,7 @@ import sbt.qsecure.monitoring.os.OSConnector;
 import sbt.qsecure.monitoring.os.WindowsConnector;
 import sbt.qsecure.monitoring.vo.AiServerSettingVO;
 import sbt.qsecure.monitoring.vo.CommandVO;
+import sbt.qsecure.monitoring.vo.CommonSettingVO;
 import sbt.qsecure.monitoring.vo.ConvExitVO;
 import sbt.qsecure.monitoring.vo.MemberVO;
 import sbt.qsecure.monitoring.vo.ServerVO;
@@ -161,7 +163,7 @@ public class ServerServiceImpl implements ServerService {
 				}
 			} catch (Exception e) {
 				log.error("Error starting CubeOne Module.", e);
-				return Result.ERR_CUBEONE_MODULE;
+				return Result.ERR_MODULE;
 			}
 		}
 		log.info("{} 이 {} {} 암호화 모듈실행", member.managerName(), server.host(), server.serverName());
@@ -187,11 +189,11 @@ public class ServerServiceImpl implements ServerService {
 				String result = osConnector
 						.sendCommand(commandMapper.getCommandstopCubeOneModule(ai.getInstance()).trim());
 				if (!result.contains("수정해야함")) {
-					return Result.ERR_CUBEONE_MODULE;
+					return Result.ERR_MODULE;
 				}
 			} catch (Exception e) {
 				log.error("Error stop CubeOne Module.", e);
-				return Result.ERR_CUBEONE_MODULE;
+				return Result.ERR_MODULE;
 			}
 		}
 
@@ -199,49 +201,40 @@ public class ServerServiceImpl implements ServerService {
 	}
 
 	@Override
-	public JSONObject getTop() {
+	public String getTop() {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
 	@Override
-	public JSONObject getCpuUsage(ServerVO vo) {
+	public String getCpuUsage(ServerVO vo) {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
 	@Override
-	public JSONObject getMemoryUsage(ServerVO vo) {
+	public String getMemoryUsage(ServerVO vo) {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
 	@Override
-	public JSONObject getDiskUsage(ServerVO vo) {
-		JSONParser parser = new JSONParser();
-		JSONObject json = null;
+	public String getDiskUsage(ServerVO server) {
+		String diskUsage = null;
 
-		if (vo.serverOs().contains("Windows")) {
-			WindowsConnector windows = new WindowsConnector(vo);
+		OSConnector osConnector = getOSConnector(server);
 
-		} else if (vo.serverOs().contains("Linux")) {
-			LinuxConnector linux = new LinuxConnector(vo);
-			try {
-				json = (JSONObject) parser.parse(linux.sendCommand(commandMapper.getCommandDiskUsage().trim()));
-			} catch (ParseException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (Exception e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
+		try {
+			diskUsage = osConnector.sendCommand("source .bash_profile;df -h $COHOME | awk 'NR==2 {print $5}'");
+		} catch (Exception e) {
+
+			e.printStackTrace();
 		}
-
-		return json;
+		return diskUsage;
 	}
 
 	@Override
-	public JSONObject getProcess(ServerVO vo) {
+	public String getProcess(ServerVO vo) {
 		JSONParser parser = new JSONParser();
 		JSONObject json = null;
 
@@ -259,7 +252,7 @@ public class ServerServiceImpl implements ServerService {
 			}
 		}
 
-		return json;
+		return null;
 	}
 
 	@Override
@@ -336,9 +329,10 @@ public class ServerServiceImpl implements ServerService {
 				result = osConnector.sendCommand("source .bash_profile;grep -c '[ERROR]' $COHOME" + directory + "/"
 						+ date + "_" + sid + "_ENC_* | awk -F: '{sum += $NF}END {print sum}'");
 				if (result.isBlank()) {
-					result = "0";
+					return "0";
 				}
-				log.info("source .bash_profile;grep -c '[ERROR]' $COHOME" + directory + "/" + date + "_" + sid + "_ENC_* | awk -F: '{sum += $NF}END {print sum}'");
+				log.info("source .bash_profile;grep -c '[ERROR]' $COHOME" + directory + "/" + date + "_" + sid
+						+ "_ENC_* | awk -F: '{sum += $NF}END {print sum}'");
 			} catch (Exception e) {
 				log.error("Error Counting Error Enc.", e);
 				return null;
@@ -368,7 +362,8 @@ public class ServerServiceImpl implements ServerService {
 				if (result.isBlank()) {
 					result = "0";
 				}
-				log.info("source .bash_profile;grep -c '[ERROR]' $COHOME" + directory + "/" + date + "_" + sid + "_DEC_* | awk -f; '{sum += $NF}END {print sum}'");
+				log.info("source .bash_profile;grep -c '[ERROR]' $COHOME" + directory + "/" + date + "_" + sid
+						+ "_DEC_* | awk -f; '{sum += $NF}END {print sum}'");
 			} catch (Exception e) {
 				log.error("Error Counting Error Enc.", e);
 				return null;
@@ -393,60 +388,69 @@ public class ServerServiceImpl implements ServerService {
 	}
 
 	@Override
-	public Result cotest(ServerVO server, String instance) {
+	public Result cotest(ServerVO server, CommonSettingVO setting) {
 		OSConnector osConnector = getOSConnector(server);
-		String result = null;
+		return getCotestResult(osConnector, setting.encLogDirectory());
+	}
 
-		if (osConnector != null) {
-			switch (server.version()) {
-			case "NEW":
-				try {
-					result = osConnector
-							.sendCommand("source .bash_profile;$COHOME/aisvr/jco_" + instance + "/cotest.sh check");
-				} catch (Exception e) {
-					log.error("Error cotest.", e);
-					return null;
-				}
-			case "OLD":
-				String[] checks = { "enc", "sap", "db" };
-				for (String type : checks) {
-					try {
-						result = osConnector.sendCommand(
-								"source .bash_profile;$COHOME/JCOCubeOneServer/JCO" + instance + "/cotest.sh " + type);
+	private Result getCotestResult(OSConnector osConnector, String path) {
 
-						if (result != null) {
-							if (result.contains("ok")) {
-								continue;
-							} else if (result.contains("failed") || result.isBlank()) {
-								if ("db".equals(type)) {
-									result = osConnector.sendCommand("source .bash_profile;$COHOME/JCOCubeOneServer/JCO"
-											+ instance + "/cotest.sh ora");
+		String[] checks = { "enc", "sap", "db" };
 
-									if (result != null && (result.contains("ok") || result.isBlank())) {
-										return Result.SUCCESS;
-									} else {
-										return Result.ERR_AIDB;
-									}
-								} else {
-									return switch (type) {
-									case "enc" -> Result.ERR_MODULE;
-									case "sap" -> Result.ERR_SAP;
-									default -> null;
-									};
-								}
-							}
-						}
-
-					} catch (Exception e) {
-						log.error("cotest 실행 중 오류 발생.", e);
-						return null;
+		for (String type : checks) {
+			try {
+				String command = String.format("source .bash_profile;$COHOME%s/cotest.sh %s", path, type);
+				String result = osConnector.sendCommand(command);
+				if (result != null) {
+					if (isSuccess(result)) {
+						continue;
+					} else if (isWrongPath(result)) {
+						return Result.ERR_WRONGPATH;
+					}
+					switch (type) {
+					case "enc":
+						return Result.ERR_MODULE;
+					case "sap":
+						return Result.ERR_SAP;
+					case "db":
+						log.info("retry db");
+						return reTryConnectDb(osConnector, path);
 					}
 				}
-				break;
+			} catch (Exception e) {
+				log.error("Error cotest.", e);
+				return Result.ERR_COTEST;
 			}
-
 		}
+		return Result.SUCCESS;
+	}
 
-		return null;
+	private Result reTryConnectDb(OSConnector osConnector, String path) {
+		try {
+			String result = osConnector
+					.sendCommand(String.format("source .bash_profile;$COHOME/%s/cotest.sh ora", path));
+			if (isSuccess(result)) {
+				log.info("success");
+				return Result.SUCCESS;
+			}
+			return Result.ERR_AIDB;
+		} catch (Exception e) {
+			return Result.ERR_COTEST;
+		}
+	}
+
+	private boolean isSuccess(String result) {
+		return (result != null && (result.contains("Hello SAP") || result.contains("complete") || result.contains("ok"))
+				&& !result.contains("failed"));
+	}
+
+	/**
+	 * 잘못된 경로 여부를 반환한다
+	 * 
+	 * @param result 명령어의 결과값
+	 * @return 경로를 포함한 명령어에 대해 공백을 받지 않았다면 true
+	 */
+	private boolean isWrongPath(String result) {
+		return (result.isBlank() || result == "");
 	}
 }
