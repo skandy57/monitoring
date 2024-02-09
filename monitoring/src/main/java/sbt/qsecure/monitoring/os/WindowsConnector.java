@@ -22,6 +22,10 @@ public class WindowsConnector implements OSConnector {
 	public String sendCommand(String command) throws Exception {
 		return null;
 	}
+	@Override
+	public boolean isConnected() {
+		return false;
+	}
 
 	@Override
 	public Server.OS getOSType() {

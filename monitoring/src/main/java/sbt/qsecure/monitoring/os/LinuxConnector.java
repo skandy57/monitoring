@@ -87,6 +87,7 @@ public class LinuxConnector implements OSConnector {
 	 * 
 	 * @return WAS <-> A/I 서버 연결 여부
 	 */
+	@Override
 	public boolean isConnected() {
 
 		try {
@@ -95,15 +96,13 @@ public class LinuxConnector implements OSConnector {
 			session.setPassword(passwd);
 			session.setConfig("StrictHostKeyChecking", "no");
 			session.connect(SSH_CONNECT_TIMEOUT);
-
+			return session.isConnected();
 		} catch (JSchException e) {
 			log.error(Server.Log.ISCONNECT.error(host), e);
 			return false;
 		} finally {
 			disconnect();
 		}
-
-		return session.isConnected();
 	}
 
 	/**
@@ -203,7 +202,7 @@ public class LinuxConnector implements OSConnector {
 		if (session != null || session.isConnected()) {
 			session.disconnect();
 		}
-		if (channel != null || channel.isConnected()) {
+		if (channel != null) {
 			channel.disconnect();
 		}
 	}
@@ -396,7 +395,14 @@ public class LinuxConnector implements OSConnector {
 //			return result.toString();
 //		}
 //	}
+	/**
+	 * CubeOne 인스턴스 기동 시 return이 바로 오지 않으니, 5초간의 리턴 기록을 받아온다.
+	 * 
+	 * @return 해당 인스턴스 실행 명령어의 5초간의 결과값
+	 * @throws JSchException
+	 */
 	private String sendInstaceStart() throws JSchException {
+
 		StringBuilder result = new StringBuilder();
 
 		try {
@@ -443,7 +449,9 @@ public class LinuxConnector implements OSConnector {
 				log.error("[sendCommand-sendInstaceStart] Error while executing task: " + e.getMessage(), e.getCause());
 			}
 		} finally {
-			executor.shutdown();
+			if (executor != null) {
+				executor.shutdown();
+			}
 			try {
 				if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
 					log.error("[sendCommand-sendInstaceStart] ExecutorService did not terminate within 5 seconds.");

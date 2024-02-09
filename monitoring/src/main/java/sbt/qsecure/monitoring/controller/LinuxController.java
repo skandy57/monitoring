@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
@@ -27,35 +28,47 @@ import sbt.qsecure.monitoring.vo.ServerVO;
 @RequiredArgsConstructor
 @RequestMapping("/server/*")
 public class LinuxController {
-	
-	private final ServerService serverService;
 
+	private final ServerService serverService;
 
 	@ResponseBody
 	@GetMapping("/getCpuAllServerAvg")
-	public double getCpuAllServerAvg(Model model) throws Exception {
+	public String getCpuAllServerAvg(Model model, HttpSession session, RedirectAttributes redirectAttributes)
+			throws Exception {
 		double totalCpu = 0;
 		int serverCount = 0;
-		List<ServerVO> aiServers = serverService.getServerList(Server.Type.AI);
+		try {
+			List<ServerVO> aiServers = serverService.getServerList(Server.Type.AI);
 
-		for (ServerVO aiServer : aiServers) {
-			totalCpu += serverService.getCpuUsage(aiServer);
-			serverCount++;
+			for (ServerVO aiServer : aiServers) {
+				totalCpu += serverService.getCpuUsage(aiServer);
+				serverCount++;
+			}
+			String averageCpu = (serverCount != 0) ? String.valueOf(totalCpu / serverCount) : "0";
+
+			return averageCpu;
+		} catch (Exception e) {
+			session.invalidate();
+			redirectAttributes.addFlashAttribute("error", "서버 목록을 가져오는 중에 오류가 발생했습니다. 다시 로그인해주세요.");
+			return "redirect:/login.html";
 		}
-		double averageCpu = (serverCount != 0) ? (totalCpu / serverCount) : 0.0;
-
-		return averageCpu;
-
 	}
 
 	@ResponseBody
 	@GetMapping("/getCpuUsage")
-	public double getCpuUsage(@RequestParam("sequence") Long sequence) {
-		ServerVO aiServer = serverService.getServerOne(sequence, Server.Type.AI);
-		
-		double cpuUsage = serverService.getCpuUsage(aiServer);
-		
-		return cpuUsage;
+	public String getCpuUsage(@RequestParam("sequence") Long sequence, HttpSession session,
+			RedirectAttributes redirectAttributes) {
+		try {
+			ServerVO aiServer = serverService.getServerOne(sequence, Server.Type.AI);
+
+			String cpuUsage = String.valueOf(serverService.getCpuUsage(aiServer));
+
+			return cpuUsage;
+		} catch (Exception e) {
+			session.invalidate();
+			redirectAttributes.addFlashAttribute("error", "서버 목록을 가져오는 중에 오류가 발생했습니다. 다시 로그인해주세요.");
+			return "redirect:/login.html";
+		}
 	}
 //	@ResponseBody
 //	@GetMapping("/getServerDetailInfo")
@@ -86,27 +99,35 @@ public class LinuxController {
 
 	@ResponseBody
 	@GetMapping("/getMemoryAllServerAvg")
-	public double getMemoryAllServerAvg() throws Exception {
+	public String getMemoryAllServerAvg(HttpSession session, RedirectAttributes redirectAttributes) throws Exception {
 
 		double totalMemory = 0;
 		int serverCount = 0;
-		List<ServerVO> aiServers = serverService.getServerList(Server.Type.AI);
 
-		for (ServerVO aiServer : aiServers) {
-			totalMemory += serverService.getMemoryUsage(aiServer);
-			serverCount++;
+		try {
+			List<ServerVO> aiServers = serverService.getServerList(Server.Type.AI);
+
+			for (ServerVO aiServer : aiServers) {
+				totalMemory += serverService.getMemoryUsage(aiServer);
+				serverCount++;
+			}
+			String averageMemory = (serverCount != 0) ? String.valueOf(totalMemory / serverCount) : "0";
+
+			return averageMemory;
+		} catch (Exception e) {
+			session.invalidate();
+			redirectAttributes.addFlashAttribute("error", "서버 목록을 가져오는 중에 오류가 발생했습니다. 다시 로그인해주세요.");
+			return "redirect:/login.html";
 		}
-		double averageMemory = (serverCount != 0) ? (totalMemory / serverCount) : 0.0;
-
-		return averageMemory;
 	}
+
 	@ResponseBody
 	@GetMapping("getMemoryUsage")
-	public double getMemoryUsage(@RequestParam("sequence")Long sequence) {
-		
+	public double getMemoryUsage(@RequestParam("sequence") Long sequence) {
+
 		ServerVO aiServer = serverService.getServerOne(sequence, Server.Type.AI);
 		double memoryUsage = serverService.getCpuUsage(aiServer);
-		
+
 		return memoryUsage;
 	}
 
@@ -118,15 +139,14 @@ public class LinuxController {
 
 	@ResponseBody
 	@GetMapping("getDiskUsage")
-	public double getDiskUsage(@RequestParam("sequence")Long sequence) {
-		
+	public double getDiskUsage(@RequestParam("sequence") Long sequence) {
+
 		ServerVO aiServer = serverService.getServerOne(sequence, Server.Type.AI);
 		double diskUsage = serverService.getCpuUsage(aiServer);
-		
+
 		return diskUsage;
 	}
-	
-	
+
 	@ResponseBody
 	@GetMapping("/getDiskAllServerAvg")
 	public double getDiskAllServerAvg() throws Exception {
@@ -153,20 +173,19 @@ public class LinuxController {
 
 		List<ServerVO> aiServers = serverService.getServerList(Server.Type.AI);
 		for (ServerVO aiServer : aiServers) {
-			if (!Server.Module.SUCCESS.equals(serverService.cotest(aiServer, null ))) {
+			if (!Server.Module.SUCCESS.equals(serverService.cotest(aiServer, null))) {
 
 			}
 		}
 
 		return null;
 	}
-	
+
 	@ResponseBody
 	@GetMapping("startCubeOneModule")
 	public Module startCubeOneModule() {
-		
-		
+
 		return null;
-		
+
 	}
 }
