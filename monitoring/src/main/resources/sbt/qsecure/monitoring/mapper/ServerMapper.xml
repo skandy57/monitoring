@@ -10,5 +10,14 @@
 		WHERE
 		serverType = #{serverType}
 	</select>
+	<select id="getServerOne"
+	resultType="sbt.qsecure.monitoring.vo.ServerVO">
+	SELECT *
+	FROM SERVER
+	WHERE
+	serverSequence = #{serverSequence}
+	AND
+	serverType = #{serverType}
+	</select>
 
 </mapper>

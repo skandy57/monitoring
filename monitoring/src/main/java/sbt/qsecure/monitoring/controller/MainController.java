@@ -42,10 +42,10 @@ public class MainController {
 		}
 		log.info("main");
 
-		List<ServerVO> aiServerList = serverService.getServerList(Server.AI);
+		List<ServerVO> aiServerList = serverService.getServerList(Server.Type.AI);
 		model.addAttribute("aiServerList", aiServerList);
 
-		List<ServerVO> securityServerList = serverService.getServerList(Server.SECURITY);
+		List<ServerVO> securityServerList = serverService.getServerList(Server.Type.SECURITY);
 		model.addAttribute("securityServerList", securityServerList);
 
 //		ServerVO testServer = aiServerList.get(0);

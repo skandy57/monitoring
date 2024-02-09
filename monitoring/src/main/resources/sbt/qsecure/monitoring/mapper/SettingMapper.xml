@@ -13,8 +13,6 @@
 	resultType="sbt.qsecure.monitoring.vo.CommonSettingVO">
 	SELECT *
 	FROM COMMONSETTING
-	WHERE
-	SYSTEM = 'prd'
 	</select>
 
 </mapper>

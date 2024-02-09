@@ -1,23 +1,19 @@
 package sbt.qsecure.monitoring.service;
 
-import java.text.SimpleDateFormat;
-import java.util.Arrays;
+import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
-
-import org.apache.ibatis.annotations.Param;
-import org.hamcrest.text.IsBlankString;
+import java.util.Map;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.RequestParam;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import sbt.qsecure.monitoring.checker.AIChecker;
 import sbt.qsecure.monitoring.constant.Auth.AuthGrade;
-import sbt.qsecure.monitoring.constant.OperationSystem;
-import sbt.qsecure.monitoring.constant.Result;
 import sbt.qsecure.monitoring.constant.Server;
+import sbt.qsecure.monitoring.constant.Server.Command.Linux;
 import sbt.qsecure.monitoring.mapper.CommandMapper;
 import sbt.qsecure.monitoring.mapper.ServerMapper;
 import sbt.qsecure.monitoring.os.LinuxConnector;
@@ -25,8 +21,6 @@ import sbt.qsecure.monitoring.os.OSConnector;
 import sbt.qsecure.monitoring.os.WindowsConnector;
 import sbt.qsecure.monitoring.vo.AiServerSettingVO;
 import sbt.qsecure.monitoring.vo.CommandVO;
-import sbt.qsecure.monitoring.vo.CommonSettingVO;
-import sbt.qsecure.monitoring.vo.ConvExitVO;
 import sbt.qsecure.monitoring.vo.MemberVO;
 import sbt.qsecure.monitoring.vo.ServerVO;
 
@@ -38,6 +32,8 @@ public class ServerServiceImpl implements ServerService {
 	private final ServerMapper serverMapper;
 	private final CommandMapper commandMapper;
 
+	private AIChecker checker = new AIChecker();
+
 	/**
 	 * 서버 유형에 따라 서버 목록을 반환한다.
 	 *
@@ -45,9 +41,21 @@ public class ServerServiceImpl implements ServerService {
 	 * @return 서버 목록
 	 */
 	@Override
-	public List<ServerVO> getServerList(Server serverType) {
+	public List<ServerVO> getServerList(Server.Type serverType) {
 
 		return serverMapper.getServerList(serverType);
+	}
+
+	/**
+	 * 지정된 서버의 정보를 반환한다
+	 *
+	 * @param sequence   지정된 서버의 시퀀스
+	 * @param serverType 서버 유형(A/I Server, Security Server, Manager Server)
+	 * @return 지정된 서버 정보
+	 */
+	@Override
+	public ServerVO getServerOne(long serverSequence, Server.Type serverType) {
+		return serverMapper.getServerOne(serverSequence, serverType);
 	}
 
 	/**
@@ -67,7 +75,7 @@ public class ServerServiceImpl implements ServerService {
 			try {
 				json = (JSONObject) parser.parse(osConnector.sendCommand(command));
 			} catch (Exception e) {
-				log.error("Error retrieving server detail information.", e);
+				log.error(Server.Log.GETSERVERINFO.error(server.host()), e);
 			}
 		}
 		return json;
@@ -82,92 +90,120 @@ public class ServerServiceImpl implements ServerService {
 	 * @return 명령 시도 후 성공 여부
 	 */
 	@Override
-	public Result startCubeOneInstance(ServerVO server, MemberVO member, AiServerSettingVO ai) {
+	public Server.Module startCubeOneInstance(ServerVO server, MemberVO member, AiServerSettingVO ai) {
 		if (!member.authGrade().equals(AuthGrade.ADMIN.toString())) {
-			return Result.NO_AUTH;
+			return Server.Module.ERR_NOAUTH;
 		}
-
+		String instance = "jco_54";
 		OSConnector osConnector = getOSConnector(server);
 		if (osConnector != null) {
 			try {
-				String command = commandMapper.getCommandstartCubeOneInstance(ai.getInstance()).trim();
+				String command = Server.Command.Linux.STARTINSTANCE.build("aisvr/jco_54");
 				String result = osConnector.sendCommand(command);
-				if (!result.contains("Running JCOCubeOneServer")) {
-					return Result.ERR_CUBEONE_INSTANCE;
+
+				if (checker.isWrongPath(result)) {
+					return Server.Module.ERR_WRONGPATH;
+				}
+
+				if (!checker.isStartInstance(result)) {
+//					log.warn(Server.Log.STARTINSTANCE.error(instance, member.managerName(), member.authGrade(),
+//							server.host(), Server.Module.ERR_INSTANCE_CONTROLL.toString()));
+					return Server.Module.ERR_INSTANCE_CONTROLL;
 				}
 			} catch (Exception e) {
-				log.error("Error starting CubeOne instance.", e);
-				return Result.ERR_CUBEONE_INSTANCE;
+//				log.error(Server.Log.STARTINSTANCE.error(instance, member.managerName(), member.authGrade(),
+//						server.host(), Server.Module.ERR_INSTANCE_CONTROLL.toString()), e);
+				return Server.Module.ERR_INSTANCE_CONTROLL;
 			}
 		}
 
-		log.info("{} 이 {} {} {} {} {} 인스턴스 실행", member.managerName(), server.host(), server.serverName(),
-				ai.getInstance(), ai.getSystemNumber(), ai.getClient());
+		log.info(Server.Log.STARTINSTANCE.success(instance, member.managerName(), member.authGrade(), server.host()));
 
-		return Result.SUCCESS;
+		return Server.Module.SUCCESS;
 	}
 
 	/**
-	 * cubeone 인스턴스 중지를 시도한 후 int를 반환
+	 * cubeone 인스턴스 중지를 시도한 후 결과 상수를 반환
 	 * 
-	 * @param server 중지를 시도할 서버
-	 * @param member 중지를 시도할 멤버
-	 * @param ai     중지를 시도할 인스턴스
-	 * @return 명령 시도 후 성공여부
+	 * @param server 중지를 시도할 서버VO
+	 * @param member 중지를 시도할 멤버VO
+	 * @param ai     중지를 시도할 인스턴스VO
+	 * @return 명령 시도 후 성공여부 결과 상수
 	 */
 	@Override
-	public Result stopCubeOneInstance(ServerVO server, MemberVO member, AiServerSettingVO ai) {
+	public Server.Module stopCubeOneInstance(ServerVO server, MemberVO member, AiServerSettingVO ai) {
 		if (!member.authGrade().equals(AuthGrade.ADMIN.toString())) {
-			return Result.NO_AUTH;
+			return Server.Module.ERR_NOAUTH;
 		}
-
+		String instance = "jco_54";
 		OSConnector osConnector = getOSConnector(server);
 
 		if (osConnector != null) {
 			try {
-				String command = commandMapper.getCommandstopCubeOneInstance(ai.getInstance()).trim();
+				String command = Server.Command.Linux.STARTINSTANCE.build("aisvr/jco_54");
 				String result = osConnector.sendCommand(command);
-				if (result.contains("Killing JCOCubeOneServer")) {
-					return Result.ERR_CUBEONE_INSTANCE;
+
+				if (checker.isWrongPath(result)) {
+//					log.warn(Server.Log.STOPINSTANCE.error(instance, member.managerName(), member.authGrade(),
+//							server.host(), Server.Module.ERR_WRONGPATH.toString()));
+					return Server.Module.ERR_WRONGPATH;
+				}
+
+				if (result != null) {
+					if (!checker.isStopInstance(result)) {
+//						log.warn(Server.Log.STOPINSTANCE.error(instance, member.managerName(), member.authGrade(),
+//								server.host(), Server.Module.ERR_INSTANCE_CONTROLL.toString()));
+						return Server.Module.ERR_INSTANCE_CONTROLL;
+					}
 				}
 			} catch (Exception e) {
-				log.error("Error stop CubeOne instance.", e);
-				return Result.ERR_CUBEONE_INSTANCE;
+//				log.error(Server.Log.STOPINSTANCE.error(instance, member.managerName(), member.authGrade(),
+//						server.host(), Server.Module.ERR_INSTANCE_CONTROLL.toString()), e);
+				return Server.Module.ERR_INSTANCE_CONTROLL;
 			}
+
 		}
-		log.info("{} 이 {} {} {} {} {} 인스턴스 실행", member.managerName(), server.host(), server.serverName(),
-				ai.getInstance(), ai.getSystemNumber(), ai.getClient());
-		return Result.SUCCESS;
+//		log.info(Server.Log.STOPINSTANCE.success(instance, member.managerName(), member.authGrade(), server.host()));
+
+		return Server.Module.SUCCESS;
 	}
 
 	/**
-	 * cubeone 모듈 기동을 시도한 후 성공여부 반환
+	 * cubeone 모듈 기동을 시도한 후 결과 상수를 반환
 	 * 
-	 * @param server 기동을 시도할 서버
-	 * @param member 기동을 시도할 멤버
-	 * @param ai     기동을 시도할 인스턴스
-	 * @return 명령 시도 후 성공여부 (NOT_ADMIN, SUCCESS, FAIL_RUN)
+	 * @param server 기동을 시도할 서버VO
+	 * @param member 기동을 시도할 멤버VO
+	 * @param ai     기동을 시도할 인스턴스VO
+	 * @return 명령 시도 후 성공여부 결과 상수
 	 */
 	@Override
-	public Result startCubeOneModule(ServerVO server, MemberVO member, AiServerSettingVO ai) {
-		if (!member.authGrade().equals(AuthGrade.ADMIN.toString())) {
-			return Result.NO_AUTH;
+	public Server.Module startCubeOneModule(ServerVO server, MemberVO member) {
+		if (!checker.isAdmin(member.authGrade())) {
+			return Server.Module.ERR_NOAUTH;
 		}
 		OSConnector osConnector = getOSConnector(server);
+
 		if (osConnector != null) {
 			try {
-				String command = commandMapper.getCommandstartCubeOneModule(server.host()).trim();
+				String command = Server.Command.Linux.STARTMODULE.build();
 				String result = osConnector.sendCommand(command);
-				if (result.contains("Killing JCOCubeOneServer")) {
-					return Result.ERR_CUBEONE_INSTANCE;
+				if (result == null) {
+					return Server.Module.ERR_MODULE_CONTROLL;
+				}
+				if (checker.isWrongPath(result)) {
+					return Server.Module.ERR_WRONGPATH;
+				}
+				if (!checker.isStartModule(result)) {
+//					log.info(Server.Log.STARTMODULE.error(member.managerName(), member.authGrade(), server.host()));
+					return Server.Module.ERR_MODULE_CONTROLL;
 				}
 			} catch (Exception e) {
-				log.error("Error starting CubeOne Module.", e);
-				return Result.ERR_MODULE;
+				log.error(Server.Log.STARTMODULE.error(member.managerName(), member.authGrade(), server.host()), e);
+				return Server.Module.ERR_MODULE_CONTROLL;
 			}
 		}
-		log.info("{} 이 {} {} 암호화 모듈실행", member.managerName(), server.host(), server.serverName());
-		return Result.SUCCESS;
+//		log.info(Server.Log.STARTMODULE.success(member.managerName(), member.authGrade(), server.host()));
+		return Server.Module.SUCCESS;
 	}
 
 	/**
@@ -179,25 +215,33 @@ public class ServerServiceImpl implements ServerService {
 	 * @return 명령 시도 후 성공여부 (NOT_ADMIN, SUCCESS, FAIL_RUN)
 	 */
 	@Override
-	public Result stopCubeOneModule(ServerVO server, MemberVO member, AiServerSettingVO ai) {
-		if (!member.authGrade().equals(AuthGrade.ADMIN.toString())) {
-			return Result.NO_AUTH;
+	public Server.Module stopCubeOneModule(ServerVO server, MemberVO member) {
+		if (!checker.isAdmin(member.authGrade())) {
+			return Server.Module.ERR_NOAUTH;
 		}
 		OSConnector osConnector = getOSConnector(server);
+
 		if (osConnector != null) {
 			try {
-				String result = osConnector
-						.sendCommand(commandMapper.getCommandstopCubeOneModule(ai.getInstance()).trim());
-				if (!result.contains("수정해야함")) {
-					return Result.ERR_MODULE;
+				String command = Server.Command.Linux.STOPMODULE.build();
+				String result = osConnector.sendCommand(command);
+				if (result == null) {
+					return Server.Module.ERR_MODULE_CONTROLL;
+				}
+				if (checker.isWrongPath(result)) {
+					return Server.Module.ERR_WRONGPATH;
+				}
+
+				if (!checker.isStopModule(result)) {
+					return Server.Module.ERR_MODULE_CONTROLL;
 				}
 			} catch (Exception e) {
-				log.error("Error stop CubeOne Module.", e);
-				return Result.ERR_MODULE;
+				log.error(Server.Log.STOPMODULE.error(member.managerName(), member.authGrade(), server.host()), e);
+				return Server.Module.ERR_MODULE_CONTROLL;
 			}
 		}
 
-		return Result.SUCCESS;
+		return Server.Module.SUCCESS;
 	}
 
 	@Override
@@ -207,75 +251,123 @@ public class ServerServiceImpl implements ServerService {
 	}
 
 	@Override
-	public String getCpuUsage(ServerVO vo) {
-		// TODO Auto-generated method stub
-		return null;
+	public double getCpuUsage(ServerVO server) {
+		String cpuUsage = null;
+		OSConnector osConnector = getOSConnector(server);
+		if (osConnector != null) {
+			try {
+				String command = Server.Command.Linux.CPU_USAGE.build();
+//				log.info(command);
+				cpuUsage = osConnector.sendCommand(command);
+
+				if (cpuUsage == null) {
+					return 0.0;
+				}
+//				log.info(Server.Log.GETCPUUSAGE.success(server.host()));
+			} catch (Exception e) {
+				log.error(Server.Log.GETCPUUSAGE.error(server.host()), e);
+				return 0.0;
+			}
+		}
+
+		return Double.parseDouble(cpuUsage);
 	}
 
 	@Override
-	public String getMemoryUsage(ServerVO vo) {
-		// TODO Auto-generated method stub
-		return null;
+	public double getMemoryUsage(ServerVO server) {
+		String memoryUsage = null;
+
+		OSConnector osConnector = getOSConnector(server);
+		try {
+			String command = Server.Command.Linux.MEMORY_USAGE.build();
+
+			memoryUsage = osConnector.sendCommand(command);
+			if (memoryUsage == null) {
+				return 0.0;
+			}
+		} catch (Exception e) {
+			log.error(Server.Log.GETMEMORYUSAGE.error(server.host()), e);
+			return 0.0;
+		}
+		return Double.parseDouble(memoryUsage);
 	}
 
 	@Override
-	public String getDiskUsage(ServerVO server) {
+	public double getDiskUsage(ServerVO server) {
 		String diskUsage = null;
 
 		OSConnector osConnector = getOSConnector(server);
 
 		try {
-			diskUsage = osConnector.sendCommand("source .bash_profile;df -h $COHOME | awk 'NR==2 {print $5}'");
+			String command = Server.Command.Linux.CPU_USAGE.build();
+			diskUsage = osConnector.sendCommand(command);
+			if (diskUsage == null) {
+				return 0.0;
+			}
 		} catch (Exception e) {
-
-			e.printStackTrace();
+			log.error(Server.Log.GETDISKUSAGE.error(server.host()), e);
+			return 0.0;
 		}
-		return diskUsage;
+		return Double.parseDouble(diskUsage);
 	}
 
 	@Override
-	public String getProcess(ServerVO vo) {
-		JSONParser parser = new JSONParser();
-		JSONObject json = null;
+	public List<Map<String, String>> getProcess(ServerVO server, String sortType) {
 
-		if (vo.serverOs().contains("Windows")) {
-			WindowsConnector windows = new WindowsConnector(vo);
-
-		} else if (vo.serverOs().contains("Linux")) {
-			LinuxConnector linux = new LinuxConnector(vo);
+		List<Map<String, String>> processList = new ArrayList<>();
+		OSConnector osConnector = getOSConnector(server);
+		if (osConnector != null) {
 			try {
-				json = (JSONObject) parser.parse(linux.sendCommand(commandMapper.getCommandProcess().trim()));
-			} catch (ParseException e) {
-				e.printStackTrace();
+				String command = Server.Command.Linux.GETPROCESS.build("cpu");
+				String result = osConnector.sendCommand(command);
+				if (!checker.isWrongPath(result)) {
+					String[] lines = result.split("\n");
+					for (int i = 1; i < lines.length; i++) {
+						String[] parts = lines[i].trim().split("\\s+");
+
+						Map<String, String> process = new LinkedHashMap<>();
+						process.put("user", parts[0]);
+						process.put("pid", parts[1]);
+						process.put("cpu", parts[2]);
+						process.put("memory", parts[3]);
+						process.put("vsz", parts[4]);
+						process.put("rss", parts[5]);
+						process.put("tty", parts[6]);
+						process.put("status", parts[7]);
+						process.put("start", parts[8]);
+						process.put("time", parts[9]);
+						process.put("command", parts[10]);
+
+						processList.add(process);
+					}
+				} else {
+					log.warn(Server.Log.GETPROCESS.error(server.host()));
+				}
 			} catch (Exception e) {
-				e.printStackTrace();
+				log.error(Server.Log.GETPROCESS.error(server.host()), e);
+				return null;
 			}
 		}
-
-		return null;
+		return processList;
 	}
 
 	@Override
-	public int addServerInfo(ServerVO vo, MemberVO member) {
-		//
-		return 0;
+	public int addServerInfo(ServerVO server) {
+		return serverMapper.addServerInfo(server);
 	}
 
 	@Override
-	public int deleteServerInfo(ServerVO vo, MemberVO member) {
-
-		return 0;
+	public int deleteServerInfo(ServerVO server) {
+		return serverMapper.deleteServerInfo(server);
 	}
 
 	@Override
-	public int updateServerInfo(ServerVO vo, MemberVO member) {
-		// TODO Auto-generated method stub
-		return 0;
+	public int updateServerInfo(ServerVO server) {
+		return serverMapper.updateServerInfo(server);
 	}
 
 	@Override
-	public JSONObject getCubeOneInstanceInfo(ServerVO vo, AiServerSettingVO ai) {
-		// TODO Auto-generated method stub
+	public JSONObject getCubeOneInstanceInfo(ServerVO server, AiServerSettingVO ai) {
 		return null;
 	}
 
@@ -286,8 +378,12 @@ public class ServerServiceImpl implements ServerService {
 	}
 
 	@Override
-	public List<CommandVO> getAllCommand(ServerVO vos) {
-		// TODO Auto-generated method stub
+	public Linux[] getAllCommand(ServerVO server) {
+//		if (server.serverOs().contains(Server.OS.WINDOWS.getOs())) {
+//			return Server.Command.Windows.values();
+//		} else if (server.serverOs().contains(Server.OS.LINUX.getOs())) {
+//			return Server.Command.Linux.values();
+//		}
 		return null;
 	}
 
@@ -323,22 +419,29 @@ public class ServerServiceImpl implements ServerService {
 	@Override
 	public String getCountEncError(ServerVO server, String directory, String date, String sid) {
 		String result = null;
+		DecimalFormat df = new DecimalFormat("###,###");
+		int encErrorCount = 0;
 		OSConnector osConnector = getOSConnector(server);
 		if (osConnector != null) {
 			try {
-				result = osConnector.sendCommand("source .bash_profile;grep -c '[ERROR]' $COHOME" + directory + "/"
-						+ date + "_" + sid + "_ENC_* | awk -F: '{sum += $NF}END {print sum}'");
-				if (result.isBlank()) {
-					return "0";
+				String command = Server.Command.Linux.COUNT_ENC_ERR.build(directory, date, sid);
+				log.info(command);
+				result = osConnector.sendCommand(command);
+
+				if (checker.isWrongPath(result)) {
+					return String.valueOf(encErrorCount);
 				}
-				log.info("source .bash_profile;grep -c '[ERROR]' $COHOME" + directory + "/" + date + "_" + sid
-						+ "_ENC_* | awk -F: '{sum += $NF}END {print sum}'");
+				encErrorCount = Integer.parseInt(result.trim());
+
+			} catch (NumberFormatException e) {
+				log.error("[getCountEncError] Failed to parse result to integer: {}", e.getMessage());
+				return null;
 			} catch (Exception e) {
-				log.error("Error Counting Error Enc.", e);
+				log.error("[getCountEncError] Failed to execute command for server: {}", server.host(), e);
 				return null;
 			}
 		}
-		return result;
+		return df.format(encErrorCount);
 	}
 
 	/**
@@ -354,22 +457,73 @@ public class ServerServiceImpl implements ServerService {
 	@Override
 	public String getCountDecError(ServerVO server, String directory, String date, String sid) {
 		String result = null;
+		DecimalFormat df = new DecimalFormat("###,###");
 		OSConnector osConnector = getOSConnector(server);
 		if (osConnector != null) {
 			try {
-				result = osConnector.sendCommand("source .bash_profile;grep -c '[ERROR]' $COHOME" + directory + "/"
-						+ date + "_" + sid + "_ENC_*");
-				if (result.isBlank()) {
+				String command = Server.Command.Linux.COUNT_DEC_ERR.build(directory, date, sid);
+				result = osConnector.sendCommand(command);
+				if (checker.isWrongPath(result)) {
 					result = "0";
 				}
-				log.info("source .bash_profile;grep -c '[ERROR]' $COHOME" + directory + "/" + date + "_" + sid
-						+ "_DEC_* | awk -f; '{sum += $NF}END {print sum}'");
 			} catch (Exception e) {
 				log.error("Error Counting Error Enc.", e);
 				return null;
 			}
 		}
-		return result;
+		return df.format(Integer.parseInt(result));
+	}
+
+	@Override
+	public Server.Module cotest(ServerVO server, String instance) {
+		OSConnector osConnector = getOSConnector(server);
+
+		String[] checks = { "enc", "sap", "db" };
+		String path = "aisvr/" + instance;
+		path = checker.addMissingFlash(path);
+		for (String type : checks) {
+			try {
+				String command = Server.Command.Linux.COTEST.build(path, type);
+				log.info(command);
+				String result = osConnector.sendCommand(command);
+
+				if (result != null) {
+					if (checker.isSuccess(result)) {
+						continue;
+					} else if (checker.isWrongPath(result)) {
+						return Server.Module.ERR_WRONGPATH;
+					}
+					switch (type) {
+					case "enc":
+						return Server.Module.ERR_MODULE_TEST;
+					case "sap":
+						return Server.Module.ERR_SAP_TEST;
+					case "db":
+						log.info("retry db");
+						return retryConnectDb(osConnector, path);
+					}
+				}
+			} catch (Exception e) {
+				log.error("Error cotest.", e);
+				return Server.Module.ERR_COTEST;
+			}
+		}
+		return Server.Module.SUCCESS;
+	}
+
+	private Server.Module retryConnectDb(OSConnector osConnector, String path) {
+		path = this.checker.addMissingFlash(path);
+		try {
+			String command = Server.Command.Linux.COTEST.retry(path);
+			String result = osConnector.sendCommand(command);
+			if (this.checker.isSuccess(result)) {
+				log.info("Retry DB Success");
+				return Server.Module.SUCCESS;
+			}
+			return Server.Module.ERR_AIDB_TEST;
+		} catch (Exception e) {
+			return Server.Module.ERR_COTEST;
+		}
 	}
 
 	/**
@@ -379,78 +533,12 @@ public class ServerServiceImpl implements ServerService {
 	 * @return OSConnector 인스턴스
 	 */
 	private OSConnector getOSConnector(ServerVO server) {
-		if (server.serverOs().contains(OperationSystem.WINDOWS.getOs())) {
+		if (server.serverOs().contains(Server.OS.WINDOWS.getOs())) {
 			return new WindowsConnector(server);
-		} else if (server.serverOs().contains(OperationSystem.LINUX.getOs())) {
+		} else if (server.serverOs().contains(Server.OS.LINUX.getOs())) {
 			return new LinuxConnector(server);
 		}
 		return null;
 	}
 
-	@Override
-	public Result cotest(ServerVO server, CommonSettingVO setting) {
-		OSConnector osConnector = getOSConnector(server);
-		return getCotestResult(osConnector, setting.encLogDirectory());
-	}
-
-	private Result getCotestResult(OSConnector osConnector, String path) {
-
-		String[] checks = { "enc", "sap", "db" };
-
-		for (String type : checks) {
-			try {
-				String command = String.format("source .bash_profile;$COHOME%s/cotest.sh %s", path, type);
-				String result = osConnector.sendCommand(command);
-				if (result != null) {
-					if (isSuccess(result)) {
-						continue;
-					} else if (isWrongPath(result)) {
-						return Result.ERR_WRONGPATH;
-					}
-					switch (type) {
-					case "enc":
-						return Result.ERR_MODULE;
-					case "sap":
-						return Result.ERR_SAP;
-					case "db":
-						log.info("retry db");
-						return reTryConnectDb(osConnector, path);
-					}
-				}
-			} catch (Exception e) {
-				log.error("Error cotest.", e);
-				return Result.ERR_COTEST;
-			}
-		}
-		return Result.SUCCESS;
-	}
-
-	private Result reTryConnectDb(OSConnector osConnector, String path) {
-		try {
-			String result = osConnector
-					.sendCommand(String.format("source .bash_profile;$COHOME/%s/cotest.sh ora", path));
-			if (isSuccess(result)) {
-				log.info("success");
-				return Result.SUCCESS;
-			}
-			return Result.ERR_AIDB;
-		} catch (Exception e) {
-			return Result.ERR_COTEST;
-		}
-	}
-
-	private boolean isSuccess(String result) {
-		return (result != null && (result.contains("Hello SAP") || result.contains("complete") || result.contains("ok"))
-				&& !result.contains("failed"));
-	}
-
-	/**
-	 * 잘못된 경로 여부를 반환한다
-	 * 
-	 * @param result 명령어의 결과값
-	 * @return 경로를 포함한 명령어에 대해 공백을 받지 않았다면 true
-	 */
-	private boolean isWrongPath(String result) {
-		return (result.isBlank() || result == "");
-	}
 }

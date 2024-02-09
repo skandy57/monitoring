@@ -2,15 +2,18 @@ package sbt.qsecure.monitoring.controller;
 
 import java.util.List;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import sbt.qsecure.monitoring.checker.AIChecker;
 import sbt.qsecure.monitoring.constant.Auth;
 import sbt.qsecure.monitoring.constant.Server;
 import sbt.qsecure.monitoring.constant.Auth.AuthGrade;
@@ -24,11 +27,36 @@ import sbt.qsecure.monitoring.vo.ServerVO;
 @RequiredArgsConstructor
 @RequestMapping("/server/*")
 public class LinuxController {
-
+	
 	private final ServerService serverService;
 
-//	
-//	
+
+	@ResponseBody
+	@GetMapping("/getCpuAllServerAvg")
+	public double getCpuAllServerAvg(Model model) throws Exception {
+		double totalCpu = 0;
+		int serverCount = 0;
+		List<ServerVO> aiServers = serverService.getServerList(Server.Type.AI);
+
+		for (ServerVO aiServer : aiServers) {
+			totalCpu += serverService.getCpuUsage(aiServer);
+			serverCount++;
+		}
+		double averageCpu = (serverCount != 0) ? (totalCpu / serverCount) : 0.0;
+
+		return averageCpu;
+
+	}
+
+	@ResponseBody
+	@GetMapping("/getCpuUsage")
+	public double getCpuUsage(@RequestParam("sequence") Long sequence) {
+		ServerVO aiServer = serverService.getServerOne(sequence, Server.Type.AI);
+		
+		double cpuUsage = serverService.getCpuUsage(aiServer);
+		
+		return cpuUsage;
+	}
 //	@ResponseBody
 //	@GetMapping("/getServerDetailInfo")
 //	public String getServerDetailInfo(ServerVO vo) {
@@ -55,69 +83,90 @@ public class LinuxController {
 //	}
 //	
 //	
-	@ResponseBody
-	@GetMapping("/getCpuUsage")
-	public double getCpuUsage(Model model) throws Exception {
-		List<ServerVO> aiServerList = serverService.getServerList(Server.AI);
-
-		ServerVO testServer = aiServerList.get(0);
-		LinuxConnector linux = new LinuxConnector(testServer);
-
-		String cpuUsage = linux.sendCommand("mpstat | awk '/all/ {print 100 - $NF}'");
-		log.info(cpuUsage);
-
-		return Double.parseDouble(cpuUsage);
-
-	}
 
 	@ResponseBody
-	@GetMapping("/getMemoryUsage")
-	public double getMemoryUsage() throws Exception {
-		List<ServerVO> aiServerList = serverService.getServerList(Server.AI);
+	@GetMapping("/getMemoryAllServerAvg")
+	public double getMemoryAllServerAvg() throws Exception {
 
-		ServerVO testServer = aiServerList.get(0);
-		LinuxConnector linux = new LinuxConnector(testServer);
+		double totalMemory = 0;
+		int serverCount = 0;
+		List<ServerVO> aiServers = serverService.getServerList(Server.Type.AI);
 
-		String memoryUsage = linux.sendCommand("free | awk '/Mem:/ {used = $2 - $4 - $6; print used / $2 * 100}'");
+		for (ServerVO aiServer : aiServers) {
+			totalMemory += serverService.getMemoryUsage(aiServer);
+			serverCount++;
+		}
+		double averageMemory = (serverCount != 0) ? (totalMemory / serverCount) : 0.0;
 
-		return (Math.round(Double.parseDouble(memoryUsage) * 100) / 100.0);
-
+		return averageMemory;
 	}
-//	
+	@ResponseBody
+	@GetMapping("getMemoryUsage")
+	public double getMemoryUsage(@RequestParam("sequence")Long sequence) {
+		
+		ServerVO aiServer = serverService.getServerOne(sequence, Server.Type.AI);
+		double memoryUsage = serverService.getCpuUsage(aiServer);
+		
+		return memoryUsage;
+	}
+
 //	@ResponseBody
 //	@GetMapping("/getCpuUsage")
 //	public String getProcess() {
-//		return null;
-//		
+//		return null;	
 //	}
-//	
 
 	@ResponseBody
-	@GetMapping("/getDiskUsage")
-	public String getDiskUsage() throws Exception {
-		int totalDiskUsage = 0;
+	@GetMapping("getDiskUsage")
+	public double getDiskUsage(@RequestParam("sequence")Long sequence) {
+		
+		ServerVO aiServer = serverService.getServerOne(sequence, Server.Type.AI);
+		double diskUsage = serverService.getCpuUsage(aiServer);
+		
+		return diskUsage;
+	}
+	
+	
+	@ResponseBody
+	@GetMapping("/getDiskAllServerAvg")
+	public double getDiskAllServerAvg() throws Exception {
+		double totalDisk = 0;
 		int serverCount = 0;
 
-		List<ServerVO> aiServers = serverService.getServerList(Server.AI);
+		List<ServerVO> aiServers = serverService.getServerList(Server.Type.AI);
 
 		for (ServerVO aiServer : aiServers) {
-			totalDiskUsage += Integer.parseInt(serverService.getDiskUsage(aiServer));
+			totalDisk += serverService.getDiskUsage(aiServer);
 			serverCount++;
 		}
 
-		double averageDiskUsage = (serverCount != 0) ? ((double) totalDiskUsage / serverCount) : 0.0;
+		double averageDisk = (serverCount != 0) ? (totalDisk / serverCount) : 0.0;
 
-		return Double.toString(averageDiskUsage);
+		return averageDisk;
 	}
 
 	@ResponseBody
-	@GetMapping("/cotest")
-	public String cotest() {
+	@GetMapping("/cotestAll")
+	public Module cotestAll() {
 
-		ServerVO aiServer = serverService.getServerList(Server.AI).get(0);
+		String host = null;
+
+		List<ServerVO> aiServers = serverService.getServerList(Server.Type.AI);
+		for (ServerVO aiServer : aiServers) {
+			if (!Server.Module.SUCCESS.equals(serverService.cotest(aiServer, null ))) {
+
+			}
+		}
 
 		return null;
-
 	}
-
+	
+	@ResponseBody
+	@GetMapping("startCubeOneModule")
+	public Module startCubeOneModule() {
+		
+		
+		return null;
+		
+	}
 }

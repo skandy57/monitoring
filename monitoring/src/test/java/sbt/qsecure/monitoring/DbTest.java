@@ -1,32 +1,20 @@
 package sbt.qsecure.monitoring;
 
-import static org.mockito.ArgumentMatchers.contains;
-
-import java.lang.ProcessHandle.Info;
-import java.sql.Connection;
-import java.sql.DatabaseMetaData;
-import java.sql.SQLException;
+import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.stream.IntStream;
+import java.util.Map;
 
-import javax.sql.DataSource;
-
-import org.apache.ibatis.session.SqlSessionFactory;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.ApplicationContext;
-import org.springframework.test.context.junit4.SpringRunner;
-
-import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import sbt.qsecure.monitoring.constant.Result;
+import sbt.qsecure.monitoring.constant.Auth.AuthGrade;
+import sbt.qsecure.monitoring.checker.AIChecker;
 import sbt.qsecure.monitoring.constant.Server;
 import sbt.qsecure.monitoring.os.LinuxConnector;
 import sbt.qsecure.monitoring.os.OSConnector;
@@ -50,7 +38,6 @@ public class DbTest {
 	@Autowired
 	private SettingService settingService;
 
-//	  
 	@Test
 	public void 로그인테스트() {
 		MemberVO login = memberService.login("root", "1234");
@@ -69,7 +56,7 @@ public class DbTest {
 
 	@Test
 	public void 로그카운트한다() {
-		List<ServerVO> list = serverService.getServerList(Server.AI);
+		List<ServerVO> list = serverService.getServerList(Server.Type.AI);
 		List<CommonSettingVO> list1 = settingService.getCommonSettingList();
 		List<ConvExitVO> list2 = settingService.getConvExitList();
 		ServerVO server = list.get(0);
@@ -89,98 +76,146 @@ public class DbTest {
 
 	@Test
 	public void 로그반복카운트한다() {
-		List<ServerVO> aiServerList = serverService.getServerList(Server.AI);
+		List<ServerVO> aiServerList = serverService.getServerList(Server.Type.AI);
 
 		ServerVO testServer = aiServerList.get(0);
 		List<CommonSettingVO> settings = settingService.getCommonSettingList();
+		log.info(settings.toString());
 		LocalDate currentDate = LocalDate.of(2023, 9, 10);
 		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
 
-		settings.forEach(setting -> {
-			AtomicInteger iterationCount = new AtomicInteger(0);
+		int iterationCount = 0;
 
-			IntStream.rangeClosed(0, 11).mapToObj(i -> currentDate.minusDays(i).format(formatter))
-					.forEach(formattedDate -> {
-						String errorCount = serverService.getCountEncError(testServer, setting.encLogDirectory() + "/",
-								formattedDate, setting.sid());
+		for (int i = 0; i <= 11; i++) {
+			String formattedDate = currentDate.minusDays(i).format(formatter);
 
-						log.info("{} 반복횟수 {} 디렉토리 : {} 에러 건수: {} 날짜 : {}", testServer.host(),
-								iterationCount.incrementAndGet(), setting.encLogDirectory(), errorCount, formattedDate);
+			settings.forEach(setting -> {
+				
+				String errorCount = serverService
+						.getCountEncError(testServer, setting.encLogDirectory(), formattedDate, setting.sid()).trim();
 
-					});
-		});
+			});
+			iterationCount++;
+		}
 	}
 
 	@Test
 	public void 코테스트한다() {
 
-		ServerVO server = serverService.getServerList(Server.AI).get(0);
+		ServerVO server = serverService.getServerList(Server.Type.AI).get(0);
+		CommonSettingVO setting = settingService.getCommonSettingList().get(0);
+
+		log.info(serverService.cotest(server, "jco_54").toString());
+
+	}
+
+
+
+	@Test
+	public void 모듈기동() throws Exception {
+		MemberVO member = memberService.getMemberById("root");
+		log.info(member.toString());
+		log.info(member.authGrade());
+		String authGrade = member.authGrade();
+		if (authGrade == "ADMIN") {
+			log.info("권한없음");
+		}
+		ServerVO server = serverService.getServerOne(1, Server.Type.AI);
+		log.info(server.toString());
+		LinuxConnector osConnector = new LinuxConnector(server);
+		String command = Server.Command.Linux.STARTMODULE.build();
+		AIChecker checker = new AIChecker();
+		String result = osConnector.sendCommand(command);
+		if (!checker.isStartModule(result)) {
+			log.info(Server.Log.STARTMODULE.error(member.managerName(), member.authGrade(), server.host()));
+		}
+		log.info(Server.Log.STARTMODULE.success(member.managerName(), member.authGrade(), server.host()));
+	}
+
+	@Test
+	public void 모듈중지() throws Exception {
+		MemberVO member = memberService.getMemberById("root");
+		AIChecker checker = new AIChecker();
+		log.info(member.toString());
+		log.info(member.authGrade());
+		String authGrade = member.authGrade();
+		if (checker.isAdmin(authGrade)) {
+			log.info("권한없음");
+		}
+		ServerVO server = serverService.getServerOne(1, Server.Type.AI);
+		log.info(server.toString());
+		LinuxConnector osConnector = new LinuxConnector(server);
+		String command = Server.Command.Linux.STOPMODULE.build();
+
+		String result = osConnector.sendCommand(command);
+		if (!checker.isStopModule(result)) {
+			log.info(Server.Log.STOPMODULE.error(member.managerName(), member.authGrade(), server.host()));
+		}
+		log.info(Server.Log.STOPMODULE.success(member.managerName(), member.authGrade(), server.host()));
+	}
+
+	@Test
+	public void 인스턴스기동() throws Exception {
+		MemberVO member = memberService.getMemberById("root");
+		AIChecker checker = new AIChecker();
+		ServerVO server = serverService.getServerOne(1, Server.Type.AI);
+		log.info(server.toString());
 		LinuxConnector osConnector = new LinuxConnector(server);
 
-		switch (server.version()) {
-		case "NEW":
-			log.info(getCotestResult(osConnector, "aisvr/jco_54").toString());
-			break;
-		case "OLD":
-			log.info(getCotestResult(osConnector, "JCOCubeOneServer/JCO54").toString());
-			break;
-		}
+		String command = Server.Command.Linux.STARTINSTANCE.build("aisvr/jco_54");
 
+		String result = osConnector.sendCommand(command);
+		log.info(result);
+		if (!checker.isStartInstance(result)) {
+			log.info(Server.Log.STARTINSTANCE.error("jco_54", member.managerName(), member.authGrade(), server.host()));
+		}
+		log.info(Server.Log.STARTINSTANCE.success("jco_54", member.managerName(), member.authGrade(), server.host()));
 	}
 
-	private Result getCotestResult(OSConnector osConnector, String path) {
+	@Test
+	public void 인스턴스중지() throws Exception {
+		MemberVO member = memberService.getMemberById("root");
+		AIChecker checker = new AIChecker();
+		ServerVO server = serverService.getServerOne(1, Server.Type.AI);
+		LinuxConnector osConnector = new LinuxConnector(server);
 
-		String[] checks = { "enc", "sap", "db" };
+		String command = Server.Command.Linux.STOPINSTANCE.build("aisvr/jco_54");
 
-		for (String type : checks) {
-			try {
-				String command = String.format("source .bash_profile;$COHOME/%s/cotest.sh %s", path, type);
-				String result = osConnector.sendCommand(command);
-				if (result != null) {
-					log.info(result);
-
-					if (isSuccess(result)) {
-						log.info(type + " is ok");
-						continue;
-					} else if (result.isBlank() || result == "") {
-						return Result.ERR_WRONGPATH;
-					}
-					switch (type) {
-					case "enc":
-						return Result.ERR_MODULE;
-					case "sap":
-						return Result.ERR_SAP;
-					case "db":
-						log.info("retry db");
-						return reTryConnectDb(osConnector, path);
-					}
-				}
-
-			} catch (Exception e) {
-				log.error("Error cotest.", e);
-				return Result.ERR_COTEST;
-			}
+		String result = osConnector.sendCommand(command);
+		if (!checker.isStopInstance(result)) {
+			log.info(Server.Log.STOPINSTANCE.error("jco_54", member.managerName(), member.authGrade(), server.host()));
 		}
-		return Result.SUCCESS;
-
+		log.info(Server.Log.STOPINSTANCE.success("jco_54", member.managerName(), member.authGrade(), server.host()));
 	}
+	
+	@Test
+	public void 프로세스목록가져온다() throws Exception {
+		ServerVO server = new ServerVO(2, null, null, "192.168.0.231", "test", "sprtms55", 22, "Linux", Server.Type.AI, "NEW");
+		LinuxConnector osConnector = new LinuxConnector(server);
+		
 
-	private Result reTryConnectDb(OSConnector osConnector, String path) {
-		try {
-			String result = osConnector.sendCommand(String.format("source .bash_profile;$COHOME/%s/cotest.sh ora", path));
-			if (isSuccess(result)) {
-				log.info("success");
-				return Result.SUCCESS;
-			}
-			return Result.ERR_AIDB;
-		} catch (Exception e) {
-			return Result.ERR_COTEST;
+		for (int i = 0; i <= 10; i++) {
+			List<Map<String, String>> result = serverService.getProcess(server, null);
+			if (result != null) {
+		        for (Map<String, String> map : result) {
+		            StringBuilder sb = new StringBuilder();
+		            sb.append("{");
+		            for (Map.Entry<String, String> entry : map.entrySet()) {
+		                sb.append(entry.getKey())
+		                  .append(": ")
+		                  .append(entry.getValue())
+		                  .append(", ");
+		            }
+		            if (!map.isEmpty()) {
+		                sb.setLength(sb.length() - 2);
+		            }
+		            sb.append("}");
+		            log.info(sb.toString());
+		        }
+		    } else {
+		        log.error("프로세스 목록을 가져오는 데 실패했습니다.");
+		    }
 		}
-
-	}
-
-	private boolean isSuccess(String result) {
-		return (result !=null && (result.contains("Hello SAP") || result.contains("complete") || result.contains("ok"))
-				&& !result.contains("failed"));
+	
 	}
 }

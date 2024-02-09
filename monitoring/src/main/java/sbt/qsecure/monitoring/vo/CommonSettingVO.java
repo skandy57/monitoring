@@ -1,9 +1,9 @@
 package sbt.qsecure.monitoring.vo;
 
 public record CommonSettingVO(
-		Long sequence, 
+		long sequence,
 		String eventLogDirectory, 
 		String encLogDirectory, 
-		String sid) {
-
-}
+		String sid,
+		String system
+		) {}

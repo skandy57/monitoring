@@ -10,9 +10,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @SpringBootApplication
 @ComponentScans({
 	@ComponentScan(basePackages = "sbt.qsecure.monitoring.controller"),
-	@ComponentScan(basePackages = "sbt.qsecure.monitoring.service")
+	@ComponentScan(basePackages = "sbt.qsecure.monitoring.service"),
 })
-
 public class MonitoringApplication {
 
 	public static void main(String[] args) {

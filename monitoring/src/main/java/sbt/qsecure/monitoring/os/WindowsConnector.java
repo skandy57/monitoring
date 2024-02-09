@@ -1,18 +1,6 @@
 package sbt.qsecure.monitoring.os;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.lang.management.ManagementFactory;
-import java.lang.management.OperatingSystemMXBean;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.UnknownHostException;
-
-import javax.management.ObjectName;
-
-import sbt.qsecure.monitoring.constant.OperationSystem;
+import sbt.qsecure.monitoring.constant.Server;
 import sbt.qsecure.monitoring.vo.ServerVO;
 
 public class WindowsConnector implements OSConnector {
@@ -36,9 +24,9 @@ public class WindowsConnector implements OSConnector {
 	}
 
 	@Override
-	public OperationSystem getOSType() {
+	public Server.OS getOSType() {
 		// TODO Auto-generated method stub
-		return OperationSystem.WINDOWS;
+		return Server.OS.WINDOWS;
 	}
 
 }

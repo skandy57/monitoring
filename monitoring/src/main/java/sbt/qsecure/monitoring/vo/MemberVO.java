@@ -4,6 +4,7 @@ import java.util.Date;
 
 import lombok.Setter;
 
+
 public record MemberVO(
 		Long memberSequence,
 		String company,

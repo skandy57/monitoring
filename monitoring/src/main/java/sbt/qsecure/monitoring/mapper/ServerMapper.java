@@ -12,8 +12,9 @@ import sbt.qsecure.monitoring.vo.ServerVO;
 @Mapper
 public interface ServerMapper {
 
-	public List<ServerVO> getServerList(Server serverType);
-	public List<ServerVO> insertServerInfo(ServerVO vo);
+	public List<ServerVO> getServerList(Server.Type serverType);
+	public ServerVO getServerOne(@Param("serverSequence")long serverSequence,@Param("serverType")Server.Type serverType);
+	public int addServerInfo(ServerVO vo);
 	public int updateServerInfo(ServerVO vo);
 	public int deleteServerInfo(ServerVO vo);
 }

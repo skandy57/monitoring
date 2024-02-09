@@ -1,9 +1,9 @@
 package sbt.qsecure.monitoring.os;
 
-import sbt.qsecure.monitoring.constant.OperationSystem;
+import sbt.qsecure.monitoring.constant.Server;
 
 public interface OSConnector {
 	
 	 String sendCommand(String command)throws Exception;
-	 OperationSystem getOSType();
+	 Server.OS getOSType();
 }

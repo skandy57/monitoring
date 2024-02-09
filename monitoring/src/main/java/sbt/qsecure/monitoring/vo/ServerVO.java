@@ -3,9 +3,8 @@ package sbt.qsecure.monitoring.vo;
 
 import sbt.qsecure.monitoring.constant.Server;
 
-
 public record ServerVO(
-		Long serverSequence,
+		long serverSequence,
 		String company,
 		String serverName,
 		String host,
@@ -13,6 +12,6 @@ public record ServerVO(
 		String passwd,
 		int port,
 		String serverOs,
-		Server serverType,
+		Server.Type serverType,
 		String version)
 {}

@@ -19,6 +19,12 @@
   AND 
   	passwd = #{passwd}
   </select>
+  <select id="getMemberById" parameterType="String" resultType="sbt.qsecure.monitoring.vo.MemberVO">
+  SELECT *
+  	FROM MEMBER
+  WHERE
+  	userId = #{userId}
+  </select>
   </mapper>
 
 
