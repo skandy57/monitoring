@@ -1,12 +1,14 @@
 package sbt.qsecure.monitoring.vo;
 
-import java.util.Date;
 
-import lombok.Setter;
+
+import java.sql.Date;
+
+
 
 
 public record MemberVO(
-		Long memberSequence,
+		long memberSequence,
 		String company,
 		String managerName, 
 		String userId, 

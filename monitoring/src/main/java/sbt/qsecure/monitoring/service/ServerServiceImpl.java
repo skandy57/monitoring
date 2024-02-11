@@ -102,7 +102,7 @@ public class ServerServiceImpl implements ServerService {
 				String result = osConnector.sendCommand(command);
 
 				if (checker.isWrongPath(result)) {
-					return Server.Module.ERR_WRONGPATH;
+					return Server.Module.ERR_WRONGPATH_INST;
 				}
 
 				if (!checker.isStartInstance(result)) {
@@ -146,7 +146,7 @@ public class ServerServiceImpl implements ServerService {
 				if (checker.isWrongPath(result)) {
 //					log.warn(Server.Log.STOPINSTANCE.error(instance, member.managerName(), member.authGrade(),
 //							server.host(), Server.Module.ERR_WRONGPATH.toString()));
-					return Server.Module.ERR_WRONGPATH;
+					return Server.Module.ERR_WRONGPATH_INST;
 				}
 
 				if (result != null) {
@@ -178,6 +178,9 @@ public class ServerServiceImpl implements ServerService {
 	 */
 	@Override
 	public Server.Module startCubeOneModule(ServerVO server, MemberVO member) {
+		if (member == null || server == null) {
+			return Server.Module.NULL;
+		}
 		if (!checker.isAdmin(member.authGrade())) {
 			return Server.Module.ERR_NOAUTH;
 		}
@@ -191,19 +194,20 @@ public class ServerServiceImpl implements ServerService {
 					return Server.Module.ERR_MODULE_CONTROLL;
 				}
 				if (checker.isWrongPath(result)) {
-					return Server.Module.ERR_WRONGPATH;
+					return Server.Module.ERR_WRONGPATH_MODULE;
 				}
 				if (!checker.isStartModule(result)) {
 //					log.info(Server.Log.STARTMODULE.error(member.managerName(), member.authGrade(), server.host()));
 					return Server.Module.ERR_MODULE_CONTROLL;
 				}
+				return Server.Module.SUCCESS;
 			} catch (Exception e) {
 				log.error(Server.Log.STARTMODULE.error(member.managerName(), member.authGrade(), server.host()), e);
 				return Server.Module.ERR_MODULE_CONTROLL;
 			}
 		}
 //		log.info(Server.Log.STARTMODULE.success(member.managerName(), member.authGrade(), server.host()));
-		return Server.Module.SUCCESS;
+		return Server.Module.ERR_UNKNOWNOS;
 	}
 
 	/**
@@ -229,7 +233,7 @@ public class ServerServiceImpl implements ServerService {
 					return Server.Module.ERR_MODULE_CONTROLL;
 				}
 				if (checker.isWrongPath(result)) {
-					return Server.Module.ERR_WRONGPATH;
+					return Server.Module.ERR_WRONGPATH_MODULE;
 				}
 
 				if (!checker.isStopModule(result)) {
@@ -278,18 +282,22 @@ public class ServerServiceImpl implements ServerService {
 		String memoryUsage = null;
 
 		OSConnector osConnector = getOSConnector(server);
-		try {
-			String command = Server.Command.Linux.MEMORY_USAGE.build();
+		if (osConnector != null) {
+			try {
+				String command = Server.Command.Linux.MEMORY_USAGE.build();
+				memoryUsage = osConnector.sendCommand(command);
 
-			memoryUsage = osConnector.sendCommand(command);
-			if (memoryUsage == null) {
+				if (memoryUsage == null) {
+					return 0.0;
+				}
+			} catch (Exception e) {
+//				log.error(Server.Log.GETMEMORYUSAGE.error(server.host()), e);
 				return 0.0;
 			}
-		} catch (Exception e) {
-			log.error(Server.Log.GETMEMORYUSAGE.error(server.host()), e);
-			return 0.0;
+			return Double.parseDouble(memoryUsage);
 		}
-		return Double.parseDouble(memoryUsage);
+
+		return 0.0;
 	}
 
 	@Override
@@ -340,6 +348,7 @@ public class ServerServiceImpl implements ServerService {
 
 						processList.add(process);
 					}
+					return processList;
 				} else {
 					log.warn(Server.Log.GETPROCESS.error(server.host()));
 				}
@@ -348,7 +357,7 @@ public class ServerServiceImpl implements ServerService {
 				return null;
 			}
 		}
-		return processList;
+		return null;
 	}
 
 	@Override
@@ -491,7 +500,7 @@ public class ServerServiceImpl implements ServerService {
 					if (checker.isSuccess(result)) {
 						continue;
 					} else if (checker.isWrongPath(result)) {
-						return Server.Module.ERR_WRONGPATH;
+						return Server.Module.ERR_WRONGPATH_INST;
 					}
 					switch (type) {
 					case "enc":

@@ -41,13 +41,13 @@ public class MainController {
 
 			ServerVO server = serverService.getServerOne(1, Server.Type.AI);
 
-			OSConnector osConnector = new LinuxConnector(server);
-
-			if (!osConnector.isConnected()) {
-				session.invalidate();
-				redirectAttributes.addFlashAttribute("Error", "서버 목록을 가져오는 중에 오류가 발생했습니다. 다시 로그인해주세요.");
-				return "redirect:/login";
-			}
+//			OSConnector osConnector = new LinuxConnector(server);
+//
+//			if (!osConnector.isConnected()) {
+//				session.invalidate();
+//				redirectAttributes.addFlashAttribute("Error", "서버 목록을 가져오는 중에 오류가 발생했습니다. 다시 로그인해주세요.");
+//				return "redirect:/login";
+//			}
 
 			List<ServerVO> aiServerList = serverService.getServerList(Server.Type.AI);
 			model.addAttribute("aiServerList", aiServerList);

@@ -9,11 +9,37 @@ public enum Server {
 	@Getter
 	@RequiredArgsConstructor
 	public enum Module {
-		SUCCESS("성공"), ERR_SAP_TEST("SAP COTEST실패"), ERR_AIDB_TEST("AI/DB COTEST실패"), ERR_MODULE_TEST("ENC COTEST실패"),
-		ERR_WRONGPATH("COTEST 경로 다름"), ERR_INSTANCE_CONTROLL("인스턴스 기동 실패"), ERR_MODULE_CONTROLL("모듈 기동 실패"),
-		ERR_NOAUTH("권한 없음"), ERR_COTEST("COTEST 오류");
+		SUCCESS, ERR_SAP_TEST, ERR_AIDB_TEST, ERR_MODULE_TEST, ERR_WRONGPATH_INST, ERR_WRONGPATH_MODULE,
+		ERR_INSTANCE_CONTROLL, ERR_MODULE_CONTROLL, ERR_NOAUTH, ERR_COTEST, ERR_UNKNOWNOS, NULL;
 
-		private final String description;
+		public static String getDescription(Module result, String... args) {
+			String[] trimmedArgs = new String[args.length];
+			for (int i = 0; i < args.length; i++) {
+				trimmedArgs[i] = args[i].trim();
+			}
+			return switch (result) {
+			case SUCCESS -> String.format("%s:%s 성공", (Object[])trimmedArgs);
+			case ERR_WRONGPATH_INST -> String.format("%s:%s 암호화 인스턴스 경로를 수정해주세요.", (Object[]) trimmedArgs);
+			case ERR_WRONGPATH_MODULE -> String.format("%s:%s 암호화 모듈 경로를 수정 해주세요.",(Object[]) trimmedArgs);
+			case ERR_NOAUTH -> "해당 기능 사용 권한이 없는 유저입니다";
+			case ERR_MODULE_CONTROLL ->String.format("%s:%s 모듈 제어 간 오류가 발생하였습니다", (Object[]) trimmedArgs);
+			case ERR_INSTANCE_CONTROLL -> String.format("암호화 인스턴스 %s 제어간 오류가 발생하였습니다.", (Object[]) trimmedArgs);
+			case ERR_UNKNOWNOS -> "잘못된 암호화 OS 세팅입니다. 암호화 모니터링 내 암호화 OS 세팅을 수정해주세요";
+			case ERR_MODULE_TEST ->
+				String.format("%s:%s 의 암호화 모듈 테스트 간 오류가 발생하였습니다. 암호화 모듈 기동 상태를 확인해주세요.", (Object[]) trimmedArgs);
+			case ERR_SAP_TEST -> String.format("%s:%s 의 암호화 SAP 통신 테스트 간 오류가 발생하였습니다. A/I <-> SAP간 방화벽을 확인해주세요.",
+					(Object[]) trimmedArgs);
+			case ERR_AIDB_TEST -> String.format("%s:%s 의 암호화 DB 통신 테스트 간 오류가 발생하였습니다. 암호화서버의 DB세팅이나 방화벽 등을 확인해주세요.",
+					(Object[]) trimmedArgs);
+			case ERR_COTEST ->
+				String.format("%s:%s 의 COTEST 오류가 발생하였습니다. WAS <-> A/I간 네트워크를 확인해주세요.", (Object[]) trimmedArgs);
+			case NULL -> String.format("%s:%s 와 통신 간 데이터를 받아오지 못했습니다. WAS <-> A/I간 네트워크를 확인해주세요.",
+					(Object[]) trimmedArgs);
+			default -> String.format("%s:%s 의 알 수 없는 오류가 발생하였습니다.", (Object[]) trimmedArgs);
+			};
+
+		}
+
 	}
 
 	@Getter
@@ -53,10 +79,45 @@ public enum Server {
 			public String success(String... args) {
 				// TODO Auto-generated method stub
 				return log(
-						"[getServerDetailInfo] Successfully to get server details infomation. Target Host=[%s] cause=[5s]",
+						"[getServerDetailInfo] Successfully to get server details infomation. Target Host=[%s] cause=[%s]",
 						args);
 			}
 
+		},
+		COTEST {
+
+			@Override
+			public String success(String... args) {
+				// TODO Auto-generated method stub
+				return null;
+			}
+
+			@Override
+			public String error(String... args) {
+				// TODO Auto-generated method stub
+				return null;
+			}
+
+//			public String error(Server.Module result, String... args) {
+//				String host = null;
+//				String port = null;
+//				if (args != null) {
+//					host = args[0];
+//					port = args[1];
+//				}
+//				return switch (result) {
+//				case ERR_WRONGPATH -> log("%s:%s 는 잘못된 암호화 인스턴스 경로입니다. 암호화 인스턴스 경로를 수정해주세요.", host, port);
+//				case ERR_MODULE_TEST -> log("%s:%s 의 암호화 모듈 테스트 간 오류가 발생하였습니다. 암호화 모듈 기동 상태를 확인해주세요.", host, port);
+//				case ERR_SAP_TEST -> log("%s:%s 의 암호화 SAP 통신 테스트 간 오류가 발생하였습니다. A/I <-> SAP간 방화벽을 확인해주세요.", host, port);
+//				case ERR_AIDB_TEST ->
+//					log("%s:%s 의 암호화 DB 통신 테스트 간 오류가 발생하였습니다. 암호화서버의 DB세팅이나 방화벽 등을 확인해주세요.", host, port);
+//				case ERR_COTEST -> log("%s:%s 의 COTEST 오류가 발생하였습니다. WAS <-> A/I간 네트워크를 확인해주세요.", host, port);
+//				case NULL ->
+//					log("%s:%s 와 통신 시도 간 NullPointerException이 발생하였습니다. WAS <-> WASDB간 네트워크를 확인해주세요.", host, port);
+//				default -> log("%s:%s 의 알 수 없는 오류가 발생하였습니다.", host, port);
+//				};
+//
+//			}
 		},
 		/**
 		 * 접속중인 유저의 성함, 권한, 타겟 서버의 IP를 받아 성공, 에러의 로그를 반환한다.
@@ -130,14 +191,14 @@ public enum Server {
 			@Override
 			public String success(String... args) {
 				return log(
-						"[stopCubeOneInstance] Successfull stop CubeOne [%s] Instance. execute Manager = [%s] Auth = [%s] Target Host = [%s]",
+						"[stopCubeOneInstance] Successfull stop CubeOne [%s] Instance. Execute Manager = [%s] Auth = [%s] Target Host = [%s]",
 						args);
 			}
 
 			@Override
 			public String error(String... args) {
 				return log(
-						"[stopCubeOneInstance] Failed stop CubeOne [%s] Instance. execute Manager = [%s] Auth = [%s] Target Host = [%s]",
+						"[stopCubeOneInstance] Failed stop CubeOne [%s] Instance. Execute Manager = [%s] Auth = [%s] Target Host = [%s]",
 						args);
 			}
 
@@ -154,7 +215,7 @@ public enum Server {
 			public String error(String... args) {
 				// TODO Auto-generated method stub
 				return log(
-						"[getCountEncError] Failed get Count Error From A/I Servers IP=[%s] DIRECTORY=[%s] CNT=[%s], DATE=[%s]",
+						"[getCountEncError] Failed get Count Error From A/I Servers Target Host=[%s] Target Directory=[%s] CNT=[%s], DATE=[%s]",
 						args);
 			}
 
@@ -169,7 +230,8 @@ public enum Server {
 
 			@Override
 			public String error(String... args) {
-				return log("[getProcess] Failed getProcess target Server [%s]", args);
+				return log("[getProcess] Failed getProcess target Server [%s], Check A/I Server and Network Settings",
+						args);
 			}
 
 		},
@@ -182,7 +244,9 @@ public enum Server {
 
 			@Override
 			public String error(String... args) {
-				return log("[connect] Failed Connect Session, Target Host=[%s] port=[%s]", args);
+				return log(
+						"[connect] Failed Connect Session, Target Host=[%s] port=[%s], Check A/I Server and Network Settings",
+						args);
 			}
 
 		},
@@ -190,12 +254,14 @@ public enum Server {
 
 			@Override
 			public String success(String... args) {
-				return log("[isConnected] WAS <-> A/I Server is Connected, Target Host=[%s]", args);
+				return log("[isConnected] WAS <-> A/I Server Success Connected, Target Host=[%s]", args);
 			}
 
 			@Override
 			public String error(String... args) {
-				return log("[isConnected] WAS <-> A/I Server is Not Connected, Target Host=[%s]", args);
+				return log(
+						"[isConnected] WAS <-> A/I Server is Not Connected, Target Host=[%s], Check A/I Server and Network Settings",
+						args);
 			}
 
 		},
@@ -255,6 +321,10 @@ public enum Server {
 		 */
 		public abstract String error(String... args);
 
+		public String error(Server.Module result, String... args) {
+			return null;
+		};
+
 		/**
 		 * 매개변수 args 배열을 trim처리 후 String.format을 반환한다
 		 * 
@@ -262,7 +332,7 @@ public enum Server {
 		 * @param args 입력받은 매개변수
 		 * @return String.format처리한 log
 		 */
-		public String log(String log, String... args) {
+		public static String log(String log, String... args) {
 			String[] trimmedArgs = new String[args.length];
 			for (int i = 0; i < args.length; i++) {
 				trimmedArgs[i] = args[i].trim();

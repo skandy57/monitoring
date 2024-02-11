@@ -49,7 +49,6 @@ public class LinuxConnector implements OSConnector {
 	private static final int SHELL_READ_BUFFER_SIZE = 1024;
 
 	private static Map<WebSocketSession, TerminalConnectionVO> sshMap = new ConcurrentHashMap<>();
-//	private ExecutorService executorService = Executors.newCachedThreadPool();
 	private ExecutorService executor = Executors.newSingleThreadExecutor();
 
 	private JSch jsch;
@@ -86,12 +85,13 @@ public class LinuxConnector implements OSConnector {
 	 * WAS와 A/I서버간 연결 가능 여부를 반환한다.
 	 * 
 	 * @return WAS <-> A/I 서버 연결 여부
+	 * @exception JSchException A/I Server자체가 내려가있거나, 네트워크 관련 문제로 exception발생할 수 있음
 	 */
 	@Override
 	public boolean isConnected() {
 
 		try {
-			log.info("{} {} {} {}", userId, host, port, passwd);
+			log.info("[isConnected] Try Connected WAS <-> A/I Server Target Host=[{}:{}] A/I Server userId=[{}]", host, port, userId);
 			session = jsch.getSession(userId, host, port);
 			session.setPassword(passwd);
 			session.setConfig("StrictHostKeyChecking", "no");
@@ -199,11 +199,15 @@ public class LinuxConnector implements OSConnector {
 	 * WAS <-> A/I 간 세션 및 채널의 연결을 해제한다.
 	 */
 	public void disconnect() {
+		try {
 		if (session != null || session.isConnected()) {
 			session.disconnect();
 		}
-		if (channel != null) {
+		if (channel != null || channel.isConnected()) {
 			channel.disconnect();
+		}
+		}catch (NullPointerException e) {
+			
 		}
 	}
 
@@ -417,19 +421,19 @@ public class LinuxConnector implements OSConnector {
 						resultStream.write(buffer, 0, bytesRead);
 
 						if (Thread.currentThread().isInterrupted()) {
-							log.warn("[sendCommand-sendInstaceStart] Input stream reading thread interrupted.");
+							log.warn("[sendInstaceStart] Input stream reading thread interrupted.");
 							break;
 						}
 
 						if (System.currentTimeMillis() - startTime > 5000) {
-							log.warn("[sendCommand-sendInstaceStart] Timeout reached while reading input stream.");
+							log.warn("[sendInstaceStart] Timeout reached while reading input stream.");
 							break;
 						}
 					}
 
 					return resultStream.toString();
 				} catch (IOException e) {
-					log.error("[sendCommand-sendInstaceStart] Exception while reading input stream: " + e.getMessage(),
+					log.error("[sendInstaceStart] Exception while reading input stream: " + e.getMessage(),
 							e);
 					return null;
 				}
@@ -439,14 +443,14 @@ public class LinuxConnector implements OSConnector {
 				result.append(future.get(5, TimeUnit.SECONDS));
 			} catch (TimeoutException e) {
 				future.cancel(true);
-				log.warn("[sendCommand-sendInstaceStart] Task execution timed out.");
+				log.warn("[sendInstaceStart] Task execution timed out.");
 			} catch (InterruptedException e) {
 				future.cancel(true);
-				log.warn("[sendCommand-sendInstaceStart] Task execution interrupted.");
+				log.warn("[sendInstaceStart] Task execution interrupted.");
 				Thread.currentThread().interrupt();
 			} catch (ExecutionException e) {
 				future.cancel(true);
-				log.error("[sendCommand-sendInstaceStart] Error while executing task: " + e.getMessage(), e.getCause());
+				log.error("[sendInstaceStart] Error while executing task: " + e.getMessage(), e.getCause());
 			}
 		} finally {
 			if (executor != null) {
@@ -454,10 +458,10 @@ public class LinuxConnector implements OSConnector {
 			}
 			try {
 				if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-					log.error("[sendCommand-sendInstaceStart] ExecutorService did not terminate within 5 seconds.");
+					log.error("[sendInstaceStart] ExecutorService did not terminate within 5 seconds.");
 				}
 			} catch (InterruptedException e) {
-				log.error("[sendCommand-sendInstaceStart] ExecutorService termination interrupted: " + e.getMessage(),
+				log.error("[sendInstaceStart] ExecutorService termination interrupted: " + e.getMessage(),
 						e);
 				Thread.currentThread().interrupt();
 			}
