@@ -15,6 +15,7 @@ import com.jcraft.jsch.Session;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import sbt.qsecure.monitoring.constant.Server;
+import sbt.qsecure.monitoring.constant.Server.Type;
 import sbt.qsecure.monitoring.os.LinuxConnector;
 import sbt.qsecure.monitoring.service.ServerService;
 import sbt.qsecure.monitoring.vo.ServerVO;
@@ -63,18 +64,20 @@ public class LinuxTest {
 	}
 	@Test
 	public void getMemoryUsage() throws Exception {
-		List<ServerVO> aiServerList = serverService.getServerList(Server.AI);
+		List<ServerVO> aiServerList = serverService.getServerList(Server.Type.AI);
 
 		ServerVO testServer = aiServerList.get(0);
 		LinuxConnector linux = new LinuxConnector(testServer);
 		
-		String memoryUsage = linux.sendCommand("free | awk '/Mem:/ {used = $2 - $4 - $6; print used / $2 * 100}'");
-		log.info(memoryUsage);
+//		String memoryUsage = linux.sendCommand("free | awk '/Mem:/ {used = $2 - $4 - $6; print used / $2 * 100}'");
+		String result = linux.sendCommand("source .bash_profile;ls -l $COHOME/aisvr");
+		log.info(result);
+	
 		
 	}
 	@Test
 	public void 에러건수를가져온다() throws Exception {
-		List<ServerVO> aiServerList = serverService.getServerList(Server.AI);
+		List<ServerVO> aiServerList = serverService.getServerList(Server.Type.AI);
 
 		ServerVO testServer = aiServerList.get(0);
 		LinuxConnector linux = new LinuxConnector(testServer);

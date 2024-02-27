@@ -9,12 +9,6 @@
 	FROM CONVEXIT
 	</select>
 	
-	<select id="getCommonSettingList"
-	resultType="sbt.qsecure.monitoring.vo.CommonSettingVO">
-	SELECT *
-	FROM COMMONSETTING
-	WHERE
-	SYSTEM = 'prd'
-	</select>
+
 
 </mapper>

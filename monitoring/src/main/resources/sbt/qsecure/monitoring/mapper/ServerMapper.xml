@@ -3,12 +3,370 @@
   PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
   "HTTP://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="sbt.qsecure.monitoring.mapper.ServerMapper">
-	<select id="getServerList" 
+	<select id="getServerList"
 		resultType="sbt.qsecure.monitoring.vo.ServerVO">
 		SELECT *
 		FROM SERVER
 		WHERE
 		serverType = #{serverType}
+	</select>
+	<select id="getServerOne"
+		resultType="sbt.qsecure.monitoring.vo.ServerVO">
+		SELECT *
+		FROM SERVER
+		WHERE
+		serverSequence = #{serverSequence}
+		AND
+		serverType = #{serverType}
+	</select>
+	<select id="getInstanceList"
+		resultType="sbt.qsecure.monitoring.vo.InstanceVO">
+		SELECT *
+		FROM INSTANCESETTING
+		WHERE
+		AIHost = #{host}
+	</select>
+	<select id="getModuleVersionToDB"
+		resultType="sbt.qsecure.monitoring.constant.Server$Version">
+		SELECT version
+		FROM SERVER
+		WHERE
+		host = #{host} AND
+		serverType
+		= #{serverType}
+	</select>
+
+	<insert id="insertJcoSettingToDB"
+		parameterType="sbt.qsecure.monitoring.vo.JcoSettingVO">
+		MERGE INTO JCOSETTING AS t
+		USING (SELECT #{instance} AS
+		instance, #{aiHost} AS aiHost) AS s
+		ON
+		t.instance = s.instance AND
+		t.aiHost = s.aiHost
+		WHEN MATCHED THEN
+		UPDATE SET
+		AIHost = #{aiHost},
+		connectionCount = #{connectionCount},
+		gwHost =
+		#{gwHost},
+		progId =
+		#{progId},
+		gwPort = #{gwPort},
+		repositoryDestination
+		=
+		#{repositoryDestination},
+		workerThreadCount =
+		#{workerThreadCount}
+		WHEN
+		NOT MATCHED THEN
+		INSERT (instance,
+		connectionCount, gwHost,
+		progId,
+		gwPort,
+		repositoryDestination,
+		workerThreadCount, AIHost)
+		VALUES
+		(#{instance}, #{connectionCount},
+		#{gwHost}, #{progId},
+		#{gwPort},
+		#{repositoryDestination},
+		#{workerThreadCount}, #{aiHost});
+	</insert>
+
+	<insert id="insertDbSettingToDB"
+		parameterType="sbt.qsecure.monitoring.vo.DbSettingVO">
+		MERGE INTO DBSETTING AS t
+		USING (
+		SELECT #{instance} AS
+		instance, #{aiHost} AS aiHost
+		) AS s
+		ON t.instance = s.instance AND
+		t.aiHost = s.aiHost
+		WHEN MATCHED THEN
+		UPDATE SET
+		AIHost = #{aiHost},
+		ip =
+		#{ip},
+		indicator = #{indicator},
+		port = #{port},
+		encLogFile = CASE
+		WHEN
+		#{encLogFile} LIKE '../%' AND (SELECT version FROM SERVER WHERE host
+		=
+		#{aiHost}) = 'NEW'
+		THEN (SELECT CONCAT(coHome, '/aisvr/log') FROM
+		SERVER WHERE host =
+		#{aiHost})
+		WHEN #{encLogFile} LIKE '../%' AND
+		(SELECT version FROM SERVER WHERE host
+		= #{aiHost}) = 'OLD'
+		THEN (SELECT
+		CONCAT(coHome, '/JCOCubeOneServer/log') FROM SERVER WHERE
+		host =
+		#{aiHost})
+		ELSE #{encLogFile}
+		END,
+		userId = #{userId},
+		logFile = CASE
+		WHEN
+		#{logFile} LIKE './%' THEN (SELECT CONCAT(directory, '/event_log')
+		FROM INSTANCESETTING
+		WHERE AIHost = #{aiHost} AND instance =
+		#{instance})
+		ELSE #{logFile}
+		END,
+		db = #{db},
+		encLog = #{encLog},
+		maxPoolSize = #{maxPoolSize},
+		item = #{item},
+		log = #{log},
+		dbName =
+		#{dbName},
+		password = #{password},
+		oldVersion = #{oldVersion},
+		difTab =
+		#{difTab},
+		oldApi = #{oldApi},
+		fixUser = #{fixUser}
+		WHEN NOT MATCHED THEN
+		INSERT (instance, ip, indicator, port, encLogFile, userId, logFile,
+		db,
+		encLog, maxPoolSize, item, log, dbName, password, oldVersion,
+		difTab,
+		oldApi, fixUser, AIHost)
+		VALUES (#{instance}, #{ip},
+		#{indicator}, #{port},
+		CASE
+		WHEN #{encLogFile} LIKE '../%' AND (SELECT
+		version FROM SERVER WHERE host
+		= #{aiHost}) = 'NEW'
+		THEN (SELECT
+		CONCAT(coHome, '/aisvr/log') FROM SERVER WHERE host =
+		#{aiHost})
+		WHEN
+		#{encLogFile} LIKE '../%' AND (SELECT version FROM SERVER WHERE host
+		=
+		#{aiHost}) = 'OLD'
+		THEN (SELECT CONCAT(coHome, '/JCOCubeOneServer/log')
+		FROM SERVER WHERE
+		host = #{aiHost})
+		ELSE #{encLogFile}
+		END,
+		#{userId},
+		CASE
+		WHEN #{logFile} LIKE './%' THEN (SELECT directory FROM
+		INSTANCESETTING
+		WHERE AIHost = #{aiHost} AND instance = #{instance})
+		ELSE #{logFile}
+		END,
+		#{db}, #{encLog}, #{maxPoolSize}, #{item}, #{log},
+		#{dbName}, #{password},
+		#{oldVersion}, #{difTab}, #{oldApi},
+		#{fixUser}, #{aiHost});
+	</insert>
+
+	<insert id="insertSapSettingToDB"
+		parameterType="sbt.qsecure.monitoring.vo.SapSettingVO">
+		MERGE INTO SAPSETTING AS t
+		USING (SELECT
+		#{aiHost} AS
+		aiHost,
+		#{instance} AS instance,
+		#{lang} AS lang,
+		#{client} AS client,
+		#{peakLimit} AS peakLimit,
+		#{passwd} AS passwd,
+		#{user} AS [user],
+		#{sysnr} AS sysnr,
+		#{poolCapacity} AS poolCapacity,
+		#{asHost} AS asHost
+		) AS s
+		ON t.AIHost = s.aiHost AND t.instance = s.instance
+		WHEN MATCHED
+		THEN
+		UPDATE SET
+		lang = #{lang},
+		client = #{client},
+		peakLimit =
+		#{peakLimit},
+		passwd = #{passwd},
+		[user] = #{user},
+		sysnr = #{sysnr},
+		poolCapacity = #{poolCapacity},
+		asHost = #{asHost}
+		WHEN NOT MATCHED THEN
+		INSERT (AIHost, instance, lang, client, peakLimit, passwd, [user],
+		sysnr,
+		poolCapacity, asHost)
+		VALUES (#{aiHost}, #{instance}, #{lang},
+		#{client}, #{peakLimit}, #{passwd},
+		#{user}, #{sysnr}, #{poolCapacity},
+		#{asHost});
+	</insert>
+
+	<insert id="insertInstanceSettingToDB"
+		parameterType="sbt.qsecure.monitoring.vo.InstanceVO">
+		MERGE INTO INSTANCESETTING AS t
+		USING (
+		SELECT #{instance}
+		AS instance,
+		#{aiHost} AS aiHost,
+		CASE
+		WHEN s.version = 'NEW' THEN
+		CONCAT(REPLACE(#{directory}, ' ', ''),
+		'/aisvr/', #{instance})
+		WHEN
+		s.version = 'OLD' THEN CONCAT(REPLACE(#{directory}, ' ', ''),
+		'/JCOCubeOneServer/', #{instance})
+		ELSE REPLACE(#{directory}, ' ', '')
+		END AS directory
+		FROM SERVER AS s
+		WHERE s.host = #{aiHost}
+		) AS s
+		ON
+		t.AIHost = s.aiHost AND t.instance = s.instance
+		WHEN MATCHED THEN
+		UPDATE SET directory = s.directory
+		WHEN NOT MATCHED THEN
+		INSERT (AIHost,
+		instance, directory)
+		VALUES (s.aiHost, s.instance, s.directory);
+	</insert>
+
+	<insert id="createInstanceTable">
+	<![CDATA[
+		IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'INSTANCESETTING')
+		BEGIN
+			CREATE TABLE INSTANCESETTING (
+				AIHost NVARCHAR(20) NOT NULL,
+				instance NVARCHAR(10) NOT NULL PRIMARY KEY,
+				directory NVARCHAR(30) NOT NULL,
+				FOREIGN KEY (AIHost) REFERENCES
+				SERVER(host)
+				);
+	    END
+    ]]>
+	</insert>
+	<insert id="createServerTable">
+    <![CDATA[
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'SERVER')
+        BEGIN
+            CREATE TABLE SERVER (
+                host NVARCHAR(20) PRIMARY KEY,
+                serverSequence DECIMAL(18, 0) IDENTITY(1,1),
+                company NVARCHAR(20) NOT NULL,
+                serverName NVARCHAR(50) NOT NULL,
+                userId NVARCHAR(20) NOT NULL,
+                passwd NVARCHAR(20) NOT NULL,
+                port INT NOT NULL,
+                serverOs NVARCHAR(20) NOT NULL,
+                serverType NVARCHAR(20) NOT NULL,
+                version NVARCHAR(10) NOT NULL,
+                coHome NVARCHAR(20) NOT NULL
+            );
+        END
+    ]]>
+	</insert>
+
+	<insert id="createJcoTable">
+    <![CDATA[
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'JCOSETTING')
+        BEGIN
+            CREATE TABLE JCOSETTING (
+                AIHost NVARCHAR(20) NOT NULL,
+                instance NVARCHAR(10) NOT NULL,
+                connectionCount NVARCHAR(2) NOT NULL,
+                gwHost NVARCHAR(20) NOT NULL,
+                progId NVARCHAR(20) NOT NULL,
+                gwPort NVARCHAR(5) NOT NULL,
+                repositoryDestination NVARCHAR(20) NOT NULL,
+                workerThreadCount NVARCHAR(3) NOT NULL,
+                FOREIGN KEY (AIHost) REFERENCES SERVER(host),
+                FOREIGN KEY (instance) REFERENCES INSTANCESETTING(instance)
+            );
+        END
+    ]]>
+	</insert>
+
+	<insert id="createDbTable">
+    <![CDATA[
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'DBSETTING')
+        BEGIN
+            CREATE TABLE DBSETTING (
+                AIHost NVARCHAR(20) NOT NULL,
+                instance NVARCHAR(10) NOT NULL,
+                ip NVARCHAR(20) NOT NULL,
+                indicator NVARCHAR(5) NOT NULL,
+                port NVARCHAR(5) NOT NULL,
+                encLogFile NVARCHAR(50) NOT NULL,
+                userId NVARCHAR(12) NOT NULL,
+                logFile NVARCHAR(50) NOT NULL,
+                db NVARCHAR(10) NOT NULL,
+                encLog NVARCHAR(30) NOT NULL,
+                maxPoolSize NVARCHAR(4) NOT NULL,
+                item NVARCHAR(12) NOT NULL,
+                [log] NVARCHAR(30),
+                dbName NVARCHAR(50) NOT NULL,
+                password NVARCHAR(30) NOT NULL,
+                oldVersion NVARCHAR(10),
+                difTab NVARCHAR(10),
+                oldApi NVARCHAR(10),
+                fixUser NVARCHAR(10),
+                FOREIGN KEY (AIHost) REFERENCES SERVER(host),
+                FOREIGN KEY (instance) REFERENCES INSTANCESETTING(instance)
+            );
+        END
+    ]]>
+	</insert>
+
+	<insert id="createSapTable">
+    <![CDATA[
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'SAPSETTING')
+        BEGIN
+            CREATE TABLE SAPSETTING (
+                AIHost NVARCHAR(20) NOT NULL,
+                instance NVARCHAR(10) NOT NULL,
+                lang NVARCHAR(3) NOT NULL,
+                client NVARCHAR(4) NOT NULL,
+                peakLimit NVARCHAR(3) NOT NULL,
+                passwd NVARCHAR(30) NOT NULL,
+                [user] NVARCHAR(12) NOT NULL,
+                sysnr NVARCHAR(3) NOT NULL,
+                poolCapacity NVARCHAR(3) NOT NULL,
+                asHost NVARCHAR(20),
+                FOREIGN KEY (AIHost) REFERENCES SERVER(host),
+                FOREIGN KEY (instance) REFERENCES INSTANCESETTING(instance)
+            );
+        END
+    ]]>
+	</insert>
+	<insert id="callCreateAllTable" statementType="CALLABLE">
+		{ call
+		createAllTable }
+	</insert>
+	<select id="getInstanceSapSettingFromDB" parameterType="string"
+		resultType="sbt.qsecure.monitoring.vo.SapSettingVO">
+		SELECT * from SAPSETTING
+		WHERE AIHost = #{host} AND
+		instance
+		= #{instance}
+	</select>
+
+	<select id="getInstanceDbSettingFromDB" parameterType="string"
+		resultType="sbt.qsecure.monitoring.vo.DbSettingVO">
+		SELECT * from DBSETTING
+		WHERE AIHost = #{host} AND
+		instance =
+		#{instance}
+	</select>
+
+	<select id="getInstanceJcoSettingFromDB" parameterType="string"
+		resultType="sbt.qsecure.monitoring.vo.JcoSettingVO">
+		SELECT * from JCOSETTING
+		WHERE AIHost = #{host} AND
+		instance
+		= #{instance}
 	</select>
 
 </mapper>

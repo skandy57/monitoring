@@ -44,7 +44,7 @@ public class SnmpWalker {
         }
     }
 
-    public void snmpWalk(sbt.qsecure.monitoring.constant.OID oidEnum) {
+    public void snmpWalk(Server.Command.OID oidEnum) {
         System.out.println("SNMP Walk for OID: " + oidEnum.getOid());
 
         try (Snmp snmp = createSnmpInstance()) {
@@ -78,7 +78,7 @@ public class SnmpWalker {
         }
     }
 
-    private static List<VariableBinding> createVariableBindingsForWalk(sbt.qsecure.monitoring.constant.OID oidEnum) {
+    private static List<VariableBinding> createVariableBindingsForWalk(Server.Command.OID oidEnum) {
         List<VariableBinding> list = new ArrayList<>();
         // Use the specified OID for SNMP walk
         list.add(new VariableBinding(new OID(oidEnum.getOid())));
