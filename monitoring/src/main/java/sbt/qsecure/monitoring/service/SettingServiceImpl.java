@@ -9,7 +9,6 @@ import lombok.extern.slf4j.Slf4j;
 import sbt.qsecure.monitoring.mapper.CommandMapper;
 import sbt.qsecure.monitoring.mapper.ServerMapper;
 import sbt.qsecure.monitoring.mapper.SettingMapper;
-import sbt.qsecure.monitoring.vo.CommonSettingVO;
 import sbt.qsecure.monitoring.vo.ConvExitVO;
 
 @Slf4j
@@ -26,10 +25,10 @@ public class SettingServiceImpl implements SettingService{
 		return settingMapper.getConvExitList();
 	}
 
-	@Override
-	public List<CommonSettingVO> getCommonSettingList() {
-		// TODO Auto-generated method stub
-		return settingMapper.getCommonSettingList();
-	}
+//	@Override
+//	public List<CommonSettingVO> getCommonSettingList() {
+//		// TODO Auto-generated method stub
+//		return settingMapper.getCommonSettingList();
+//	}
 
 }

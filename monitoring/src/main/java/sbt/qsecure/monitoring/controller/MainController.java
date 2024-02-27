@@ -17,11 +17,11 @@ import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import sbt.qsecure.monitoring.constant.Server;
+import sbt.qsecure.monitoring.constant.Server.Type;
 import sbt.qsecure.monitoring.os.LinuxConnector;
 import sbt.qsecure.monitoring.os.OSConnector;
 import sbt.qsecure.monitoring.service.ServerService;
 import sbt.qsecure.monitoring.service.SettingService;
-import sbt.qsecure.monitoring.vo.CommonSettingVO;
 import sbt.qsecure.monitoring.vo.ConvExitVO;
 import sbt.qsecure.monitoring.vo.ServerVO;
 
@@ -39,7 +39,7 @@ public class MainController {
 			Optional.ofNullable(session.getAttribute("userId"))
 					.orElseThrow(() -> new IllegalStateException("사용자가 로그인되어 있지 않습니다."));
 
-			ServerVO server = serverService.getServerOne(1, Server.Type.AI);
+			ServerVO server = serverService.getServerOne(1, Type.AI);
 
 //			OSConnector osConnector = new LinuxConnector(server);
 //
@@ -49,14 +49,14 @@ public class MainController {
 //				return "redirect:/login";
 //			}
 
-			List<ServerVO> aiServerList = serverService.getServerList(Server.Type.AI);
+			List<ServerVO> aiServerList = serverService.getServerList(Type.AI);
 			model.addAttribute("aiServerList", aiServerList);
 
-			List<ServerVO> securityServerList = serverService.getServerList(Server.Type.SECURITY);
+			List<ServerVO> securityServerList = serverService.getServerList(Type.SECURITY);
 			model.addAttribute("securityServerList", securityServerList);
 
 //		ServerVO testServer = aiServerList.get(0);
-			List<CommonSettingVO> settings = settingService.getCommonSettingList();
+//			List<CommonSettingVO> settings = settingService.getCommonSettingList();
 //		CommonSettingVO setting = settings.get(0);
 			List<ConvExitVO> convs = settingService.getConvExitList();
 //		ConvExitVO conv = convs.get(0);

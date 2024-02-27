@@ -1,5 +1,7 @@
 package sbt.qsecure.monitoring.os;
 
+import java.util.List;
+
 import sbt.qsecure.monitoring.constant.Server;
 import sbt.qsecure.monitoring.vo.ServerVO;
 
@@ -32,5 +34,13 @@ public class WindowsConnector implements OSConnector {
 		// TODO Auto-generated method stub
 		return Server.OS.WINDOWS;
 	}
+
+	@Override
+	public List<String> sendCommandList(String... command) throws Exception {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+
 
 }

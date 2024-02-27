@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.ibatis.annotations.Param;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,10 +24,13 @@ import lombok.extern.slf4j.Slf4j;
 import sbt.qsecure.monitoring.checker.AIChecker;
 import sbt.qsecure.monitoring.constant.Auth;
 import sbt.qsecure.monitoring.constant.Server;
+import sbt.qsecure.monitoring.constant.Server.Module;
+import sbt.qsecure.monitoring.constant.Server.Type;
 import sbt.qsecure.monitoring.constant.Auth.AuthGrade;
 import sbt.qsecure.monitoring.os.LinuxConnector;
 import sbt.qsecure.monitoring.service.ServerService;
-import sbt.qsecure.monitoring.vo.AiServerSettingVO;
+import sbt.qsecure.monitoring.vo.DbSettingVO;
+import sbt.qsecure.monitoring.vo.InstanceVO;
 import sbt.qsecure.monitoring.vo.MemberVO;
 import sbt.qsecure.monitoring.vo.ServerVO;
 
@@ -45,7 +49,7 @@ public class LinuxController {
 		double totalCpu = 0;
 		int serverCount = 0;
 		try {
-			List<ServerVO> aiServers = serverService.getServerList(Server.Type.AI);
+			List<ServerVO> aiServers = serverService.getServerList(Type.AI);
 
 			for (ServerVO aiServer : aiServers) {
 				try {
@@ -72,7 +76,7 @@ public class LinuxController {
 	public String getCpuUsage(@RequestParam("serverSequence") Long serverSequence, Model model,
 			RedirectAttributes redirectAttributes) {
 		try {
-			ServerVO aiServer = serverService.getServerOne(serverSequence, Server.Type.AI);
+			ServerVO aiServer = serverService.getServerOne(serverSequence, Type.AI);
 
 			String cpuUsage = String.valueOf(serverService.getCpuUsage(aiServer));
 
@@ -121,7 +125,7 @@ public class LinuxController {
 		int serverCount = 0;
 
 		try {
-			List<ServerVO> aiServers = serverService.getServerList(Server.Type.AI);
+			List<ServerVO> aiServers = serverService.getServerList(Type.AI);
 
 			for (ServerVO aiServer : aiServers) {
 				try {
@@ -148,7 +152,7 @@ public class LinuxController {
 	public String getMemoryUsage(@RequestParam("serverSequence") long serverSequence, Model model,
 			RedirectAttributes redirectAttributes) {
 		try {
-			ServerVO aiServer = serverService.getServerOne(serverSequence, Server.Type.AI);
+			ServerVO aiServer = serverService.getServerOne(serverSequence, Type.AI);
 			String memoryUsage = String.valueOf(serverService.getCpuUsage(aiServer));
 
 			return memoryUsage;
@@ -171,7 +175,7 @@ public class LinuxController {
 	@GetMapping("getDiskUsage")
 	public String getDiskUsage(@RequestParam("sequence") long serverSequence) {
 
-		ServerVO aiServer = serverService.getServerOne(serverSequence, Server.Type.AI);
+		ServerVO aiServer = serverService.getServerOne(serverSequence, Type.AI);
 		String diskUsage = String.valueOf(serverService.getCpuUsage(aiServer));
 
 		return diskUsage;
@@ -183,7 +187,7 @@ public class LinuxController {
 		double totalDisk = 0;
 		int serverCount = 0;
 
-		List<ServerVO> aiServers = serverService.getServerList(Server.Type.AI);
+		List<ServerVO> aiServers = serverService.getServerList(Type.AI);
 
 		for (ServerVO aiServer : aiServers) {
 			totalDisk += serverService.getDiskUsage(aiServer);
@@ -250,18 +254,18 @@ public class LinuxController {
 		List<String> successMessages = new ArrayList<>();
 		List<String> errorMessages = new ArrayList<>();
 
-		List<ServerVO> aiServers = serverService.getServerList(Server.Type.AI);
+		List<ServerVO> aiServers = serverService.getServerList(Type.AI);
 		for (ServerVO aiServer : aiServers) {
 			String[] serverInfo = { aiServer.host(), String.valueOf(aiServer.port()) };
-			Server.Module result = serverService.cotest(aiServer, "jco_54");
-			switch (result != null ? result : Server.Module.NULL) {
+			Module result = serverService.cotest(aiServer, "jco_54");
+			switch (result != null ? result : Module.NULL) {
 			case SUCCESS:
 				successServers.add(aiServer);
-				successMessages.add(Server.Module.getDescription(result, serverInfo));
+				successMessages.add(Module.getDescription(result, serverInfo));
 				continue;
 			default:
 				failedServers.add(aiServer);
-				errorMessages.add(Server.Module.getDescription(result, serverInfo));
+				errorMessages.add(Module.getDescription(result, serverInfo));
 				break;
 			}
 		}
@@ -275,22 +279,27 @@ public class LinuxController {
 
 		return failedServers;
 	}
+
 	@ResponseBody
 	@GetMapping("/cotest")
-	public String cotest(@Param("serverSequence")long serverSequence ,Model model) {
-		
-		ServerVO aiServer = serverService.getServerOne(serverSequence, Server.Type.AI);
-		
+	public String cotest(@Param("serverSequence") long serverSequence, String instanceName, Model model) {
+
+		ServerVO aiServer = serverService.getServerOne(serverSequence, Type.AI);
+
 		String[] serverInfo = { aiServer.host(), String.valueOf(aiServer.port()) };
-		
-		Server.Module result = serverService.cotest(aiServer, "jco_54");
-		
-		model.addAttribute("result", Server.Module.getDescription(result, serverInfo));
-		
-		
-		
+
+		Set<InstanceVO> instanceList = serverService.getInstanceListToServer(aiServer);
+
+		if (instanceList.stream().noneMatch(instance -> instance.instance().equals(instanceName))) {
+			return null;
+		}
+
+		Module result = serverService.cotest(aiServer, instanceName);
+
+		model.addAttribute("result", Module.getDescription(result, serverInfo));
+
 		return null;
-		
+
 	}
 
 	@ResponseBody
@@ -306,22 +315,18 @@ public class LinuxController {
 		String authGrade = (String) session.getAttribute("authGrade");
 
 		ServerVO aiServer = serverService.getServerOne(serverSequence, Server.Type.AI);
+		String[] serverInfo = { aiServer.host(), String.valueOf(aiServer.port()) };
 		MemberVO member = new MemberVO(memberSequence, company, managerName, userId, null, phoneNumber, email, regDate,
 				authGrade);
 
 		String message = null;
-		Server.Module result = serverService.startCubeOneModule(aiServer, member);
-		switch (result != null ? result : Server.Module.NULL) {
-		case SUCCESS -> message = "기동 성공";
-		case ERR_NOAUTH -> message = "해당 기능 사용 권한이 없는 유저입니다";
-		case ERR_MODULE_CONTROLL -> message = "모듈 제어 간 오류가 발생하였습니다";
-		case ERR_WRONGPATH_MODULE -> message = "잘못된 암호화 모듈 경로 입니다. 암호화 모듈 경로를 수정 해주세요.";
-		case ERR_UNKNOWNOS -> message = "잘못된 암호화 OS 세팅입니다. WASDB내 암호화 OS 세팅을 수정해주세요";
-		case NULL -> message = "NullPointerException이 발생하였습니다. WAS <-> WASDB간 통신을 확인해주세요.";
-		default -> message = "A";
+		Module result = serverService.startCubeOneModule(aiServer, member);
+		switch (result != null ? result : Module.NULL) {
+		case SUCCESS -> message = Module.getDescription(result, serverInfo);
+		default -> message = Module.getDescription(result, serverInfo);
 		}
 		model.addAttribute("message", message);
-		return null;
+		return message;
 
 	}
 }

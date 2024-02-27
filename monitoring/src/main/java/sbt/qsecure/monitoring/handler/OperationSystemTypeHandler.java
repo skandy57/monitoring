@@ -9,35 +9,36 @@ import org.apache.ibatis.type.JdbcType;
 import org.apache.ibatis.type.MappedTypes;
 import org.apache.ibatis.type.TypeHandler;
 import sbt.qsecure.monitoring.constant.Server;
+import sbt.qsecure.monitoring.constant.Server.OS;
 
-@MappedTypes(Server.OS.class)
-public class OperationSystemTypeHandler implements TypeHandler<Server.OS> {
+@MappedTypes(OS.class)
+public class OperationSystemTypeHandler implements TypeHandler<OS> {
 
 	@Override
-	public void setParameter(PreparedStatement ps, int i, Server.OS parameter, JdbcType jdbcType)
+	public void setParameter(PreparedStatement ps, int i, OS parameter, JdbcType jdbcType)
 			throws SQLException {
 		ps.setString(i, parameter.getOs());
 	}
 
 	@Override
-	public Server.OS getResult(ResultSet rs, String columnName) throws SQLException {
+	public OS getResult(ResultSet rs, String columnName) throws SQLException {
 		String key = rs.getString(columnName);
 		return getOS(key);
 	}
 
 	@Override
-	public Server.OS getResult(ResultSet rs, int columnIndex) throws SQLException {
+	public OS getResult(ResultSet rs, int columnIndex) throws SQLException {
 		String key = rs.getString(columnIndex);
 		return getOS(key);
 	}
 
 	@Override
-	public Server.OS getResult(CallableStatement cs, int columnIndex) throws SQLException {
+	public OS getResult(CallableStatement cs, int columnIndex) throws SQLException {
 		String key = cs.getString(columnIndex);
 		return getOS(key);
 	}
 
-	private Server.OS getOS(String type) {
+	private OS getOS(String type) {
 		return switch (type) {
 		case "Windows" -> Server.OS.WINDOWS;
 		case "Linux" -> Server.OS.LINUX;

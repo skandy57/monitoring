@@ -69,8 +69,10 @@ public class LinuxTest {
 		ServerVO testServer = aiServerList.get(0);
 		LinuxConnector linux = new LinuxConnector(testServer);
 		
-		String memoryUsage = linux.sendCommand("free | awk '/Mem:/ {used = $2 - $4 - $6; print used / $2 * 100}'");
-		log.info(memoryUsage);
+//		String memoryUsage = linux.sendCommand("free | awk '/Mem:/ {used = $2 - $4 - $6; print used / $2 * 100}'");
+		String result = linux.sendCommand("source .bash_profile;ls -l $COHOME/aisvr");
+		log.info(result);
+	
 		
 	}
 	@Test
