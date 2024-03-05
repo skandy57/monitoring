@@ -5,6 +5,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 import org.springframework.stereotype.Controller;
@@ -16,10 +17,10 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import sbt.qsecure.monitoring.connector.LinuxConnector;
+import sbt.qsecure.monitoring.connector.OSConnector;
 import sbt.qsecure.monitoring.constant.Server;
 import sbt.qsecure.monitoring.constant.Server.Type;
-import sbt.qsecure.monitoring.os.LinuxConnector;
-import sbt.qsecure.monitoring.os.OSConnector;
 import sbt.qsecure.monitoring.service.ServerService;
 import sbt.qsecure.monitoring.service.SettingService;
 import sbt.qsecure.monitoring.vo.ConvExitVO;
@@ -36,64 +37,16 @@ public class MainController {
 	@GetMapping("/main")
 	public String main(Model model, HttpSession session, RedirectAttributes redirectAttributes) throws Exception {
 		try {
-			Optional.ofNullable(session.getAttribute("userId"))
-					.orElseThrow(() -> new IllegalStateException("사용자가 로그인되어 있지 않습니다."));
+			Optional.ofNullable(session.getAttribute("userId")).orElseThrow(() -> new IllegalStateException("사용자가 로그인되어 있지 않습니다."));
 
 			ServerVO server = serverService.getServerOne(1, Type.AI);
 
-//			OSConnector osConnector = new LinuxConnector(server);
-//
-//			if (!osConnector.isConnected()) {
-//				session.invalidate();
-//				redirectAttributes.addFlashAttribute("Error", "서버 목록을 가져오는 중에 오류가 발생했습니다. 다시 로그인해주세요.");
-//				return "redirect:/login";
-//			}
-
 			List<ServerVO> aiServerList = serverService.getServerList(Type.AI);
 			model.addAttribute("aiServerList", aiServerList);
-
+			session.setAttribute("serverSequenceList", aiServerList.stream().map(ServerVO::serverSequence).collect(Collectors.toList()));
 			List<ServerVO> securityServerList = serverService.getServerList(Type.SECURITY);
 			model.addAttribute("securityServerList", securityServerList);
 
-//		ServerVO testServer = aiServerList.get(0);
-//			List<CommonSettingVO> settings = settingService.getCommonSettingList();
-//		CommonSettingVO setting = settings.get(0);
-			List<ConvExitVO> convs = settingService.getConvExitList();
-//		ConvExitVO conv = convs.get(0);
-
-//		LocalDate currentDate = LocalDate.now();
-//
-//		DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
-//
-//		for (int i = 11; i >= 0; i--) {
-//			LocalDate date = currentDate.minusDays(i);
-//			String formattedDate = date.format(formatter);
-//
-//		}
-			LocalDate currentDate = LocalDate.now();
-			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
-//
-//			for (ServerVO server : aiServerList) {
-//				for (CommonSettingVO setting : settings) {
-//					for (ConvExitVO conv : convs) {
-//						for (int i = 11; i >= 0; i--) {
-//							LocalDate date = currentDate.minusDays(i);
-//							String formattedDate = date.format(formatter);
-//
-//							String errorCount = serverService.getCountEncError(server, setting.encLogDirectory(),
-//									formattedDate, setting.sid());
-//							if (errorCount == null) {
-//								log.info("Error count for server {} with setting {} and conv {}: {}", server.host(),
-//										setting.encLogDirectory(), conv.conversionExit(), errorCount);
-//								session.invalidate();
-//								redirectAttributes.addFlashAttribute("Error", "서버 목록을 가져오는 중에 오류가 발생했습니다. 다시 로그인해주세요.");
-//								return "redirect:/login.html";
-//							}
-//
-//						}
-//					}
-//				}
-//			}
 		} catch (IllegalStateException e) {
 			model.addAttribute("Error", "세션이 만료되어 재로그인 해주세요");
 			return "redirect:/login";

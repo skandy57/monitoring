@@ -14,9 +14,9 @@ import com.jcraft.jsch.Session;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import sbt.qsecure.monitoring.connector.LinuxConnector;
 import sbt.qsecure.monitoring.constant.Server;
 import sbt.qsecure.monitoring.constant.Server.Type;
-import sbt.qsecure.monitoring.os.LinuxConnector;
 import sbt.qsecure.monitoring.service.ServerService;
 import sbt.qsecure.monitoring.vo.ServerVO;
 

@@ -1,17 +1,20 @@
 package sbt.qsecure.monitoring.checker;
 
-import static org.junit.Assert.assertTrue;
 
+
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Parameter;
 import java.util.Objects;
 
 import org.springframework.stereotype.Component;
 
-import sbt.qsecure.monitoring.constant.Server;
-import sbt.qsecure.monitoring.constant.Auth.AuthGrade;
-import sbt.qsecure.monitoring.constant.Server.Module;;
+import sbt.qsecure.monitoring.connector.OSConnector;
+import sbt.qsecure.monitoring.constant.Server.Module;
+import sbt.qsecure.monitoring.constant.Server.Version;
+import sbt.qsecure.monitoring.vo.DbSettingVO;
 
 @Component
-public class AIChecker {
+public class AIValidator {
 
 	private static String MODULESTART = "MODULESTART";
 	private static String MODULESTOP = "MODULESTOP";
@@ -197,16 +200,50 @@ public class AIChecker {
 		return false;
 	}
 
+	/**
+	 * {@link OSConnector}에서 sendCommand의 결과값으로 디렉토리인지 확인하여 boolean을 리턴한다
+	 * 
+	 * @param result sendCommand의 결과값
+	 * @return 디렉토리 여부
+	 */
 	public boolean isDirectory(String result) {
 		return result.startsWith("d") && !result.contains("log") && !result.contains("bak");
 	}
 
-	public void requireNonNullParams(Object... params) {
-		for (Object param : params) {
-			Objects.requireNonNull(param);
+	/**
+	 * NULL값이 들어오면 안되는 파라미터들을 체크하고,<p>
+	 * 생성자를 호출한 메소드의 이름으로 로그와 NULL값인 파라미터이름을 찍는다.
+	 * 
+	 * @param parameters NULL체크가 필요한 파라미터
+	 */
+	public static void validateParameters(String... parameters) {
+		String methodName = null;
+		StackTraceElement[] stackTrace = Thread.currentThread().getStackTrace();
+		for (int i = 1; i < stackTrace.length; i++) {
+			StackTraceElement element = stackTrace[i];
+			if ("<init>".equals(element.getMethodName())) {
+				if (i + 1 < stackTrace.length) {
+					StackTraceElement enclosingElement = stackTrace[i + 1];
+					methodName = enclosingElement.getMethodName();
+				} else {
+					throw new IllegalStateException("Failed to find enclosing method");
+				}
+			}
+		}
+
+		Constructor<?> constructor = DbSettingVO.class.getDeclaredConstructors()[0];
+		Parameter[] methodParameters = constructor.getParameters();
+
+		for (int i = 0; i < parameters.length; i++) {
+			if (i < 0 || i >= methodParameters.length) {
+				throw new IllegalArgumentException("Parameter index out of bounds");
+			}
+
+			String parameterName = methodParameters[i].getName();
+			Objects.requireNonNull(parameters[i],
+					"[" + methodName + "] The value of parameter '" + parameterName + "' is required. Provided value = [" + parameters[i] + "]");
 		}
 	}
-
 //	public boolean isDecrypted(String result) {
 //		return !result.contains("CubeOne for SAP") && isNumber(result);
 //	}

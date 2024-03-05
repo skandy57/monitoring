@@ -8,6 +8,6 @@ import sbt.qsecure.monitoring.vo.ConvExitVO;
 
 @Mapper
 public interface SettingMapper {
-	public List<ConvExitVO> getConvExitList();
+//	public List<ConvExitVO> getConvExitList();
 //	public List<CommonSettingVO> getCommonSettingList();
 }

@@ -1,11 +1,19 @@
 package sbt.qsecure.monitoring.controller;
 
+import java.io.IOException;
 import java.sql.Date;
+import java.text.DecimalFormat;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import org.apache.ibatis.annotations.Param;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,16 +26,17 @@ import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import sbt.qsecure.monitoring.checker.AIChecker;
+import sbt.qsecure.monitoring.checker.AIValidator;
+import sbt.qsecure.monitoring.connector.LinuxConnector;
 import sbt.qsecure.monitoring.constant.Auth;
 import sbt.qsecure.monitoring.constant.Server;
 import sbt.qsecure.monitoring.constant.Server.Module;
 import sbt.qsecure.monitoring.constant.Server.Type;
 import sbt.qsecure.monitoring.constant.Auth.AuthGrade;
-import sbt.qsecure.monitoring.os.LinuxConnector;
 import sbt.qsecure.monitoring.service.ServerService;
 import sbt.qsecure.monitoring.vo.DbSettingVO;
 import sbt.qsecure.monitoring.vo.InstanceVO;
@@ -44,8 +53,7 @@ public class LinuxController {
 
 	@ResponseBody
 	@GetMapping("/getCpuAllServerAvg")
-	public String getCpuAllServerAvg(Model model, HttpSession session, RedirectAttributes redirectAttributes)
-			throws Exception {
+	public String getCpuAllServerAvg(Model model, HttpSession session, RedirectAttributes redirectAttributes) throws Exception {
 		double totalCpu = 0;
 		int serverCount = 0;
 		try {
@@ -73,8 +81,7 @@ public class LinuxController {
 
 	@ResponseBody
 	@GetMapping("/getCpuUsage")
-	public String getCpuUsage(@RequestParam("serverSequence") Long serverSequence, Model model,
-			RedirectAttributes redirectAttributes) {
+	public String getCpuUsage(@RequestParam("serverSequence") long serverSequence, Model model, RedirectAttributes redirectAttributes) {
 		try {
 			ServerVO aiServer = serverService.getServerOne(serverSequence, Type.AI);
 
@@ -90,6 +97,108 @@ public class LinuxController {
 			}
 		}
 	}
+
+//	@ResponseBody
+//	@GetMapping("/getCountEncErrorAllServer")
+//	public String getCountEncErrorAllServer(HttpSession session, RedirectAttributes redirectAttributes) {
+//
+//		// 서버 시퀀스 목록을 세션에서 가져옵니다.
+//		@SuppressWarnings("unchecked")
+//		List<Long> serverSequenceList = (List<Long>) session.getAttribute("serverSequenceList");
+//
+//		// 암호화 오류 발생 횟수를 저장할 변수.
+//		AtomicInteger errCount = new AtomicInteger(0);
+//
+//		// 각 서버 시퀀스에 대해 병렬 처리.
+//		serverSequenceList.parallelStream().forEach(serverSequence -> {
+//			// 서버 시퀀스로부터 해당 AI 서버 정보를 가져온다.
+//			ServerVO aiServer = serverService.getServerOne(serverSequence, Type.AI);
+//
+//			// AI 서버의 인스턴스 목록을 가져온다.
+//			List<InstanceVO> instanceList = serverService.getInstanceListToDB(aiServer.host());
+//
+//			// 현재 날짜를 가져온다.
+//			LocalDate currentDate = LocalDate.now();
+//			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyyMMdd");
+//			String formatDate = currentDate.format(formatter);
+//
+//			// 각 인스턴스에 대해 반복한다.
+//			for (InstanceVO instance : instanceList) {
+//				// 인스턴스의 데이터베이스 설정에서 로그 파일 경로를 가져온다.
+//				DbSettingVO dbSetting = serverService.getInstanceDbSettingFromDB(aiServer.host(), instance.instance());
+//
+//				// 로그 파일에서 오늘 날짜를 기준으로 암호화 오류 발생 횟수를 가져와 errCount에 더한다.
+//				errCount.addAndGet(Integer.parseInt(serverService.getCountEncError(aiServer, dbSetting.encLogFile(), formatDate)));
+//			}
+//		});
+//
+//		// 발생한 암호화 오류 횟수를 포맷팅하여 반환합니다.
+//		DecimalFormat df = new DecimalFormat("###,###");
+//		return df.format(errCount);
+//	}
+//	
+	@ResponseBody
+	@GetMapping("/getCountEncErrorAllServer")
+	public String getCountEncErrorAllServer(HttpSession session, HttpServletResponse response) throws IOException {
+        // 서버 시퀀스 목록을 세션에서 가져온다.
+        @SuppressWarnings("unchecked")
+        List<Long> serverSequenceList = (List<Long>) session.getAttribute("serverSequenceList");
+
+        if (serverSequenceList == null) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Server sequence list is null");
+            return null;
+        }
+
+        // 암호화 오류 발생 횟수를 저장할 변수.
+        AtomicInteger errCount = new AtomicInteger(0);
+
+        // 현재 날짜를 가져온다.
+        LocalDate currentDate = LocalDate.now();
+        String formatDate = currentDate.format(DateTimeFormatter.BASIC_ISO_DATE);
+
+        // CompletableFuture를 이용하여 비동기적으로 작업을 처리한다.
+        List<CompletableFuture<Object>> futures = serverSequenceList.stream()
+                .map(serverSequence -> CompletableFuture.supplyAsync(() -> {
+                    // 서버 시퀀스로부터 해당 AI 서버 정보를 가져온다.
+                    ServerVO aiServer = serverService.getServerOne(serverSequence, Type.AI);
+
+                    if (aiServer == null) {
+                        return null;
+                    }
+
+                    // AI 서버의 인스턴스 목록을 가져옵니다.
+                    List<InstanceVO> instanceList = serverService.getInstanceListToDB(aiServer.host());
+
+                    // 각 인스턴스에 대해 반복한다.
+                    for (InstanceVO instance : instanceList) {
+                        // 인스턴스의 데이터베이스 설정에서 로그 파일 경로를 가져온다.
+                        DbSettingVO dbSetting = serverService.getInstanceDbSettingFromDB(aiServer.host(), instance.instance());
+
+                        if (dbSetting != null) {
+                            // 로그 파일에서 오늘 날짜를 기준으로 암호화 오류 발생 횟수를 가져와 errCount에 더한다.
+                            int count = Integer.parseInt(serverService.getCountEncError(aiServer, dbSetting.encLogFile(), formatDate));
+                            errCount.addAndGet(count);
+                        }
+                    }
+                    return null;
+                }))
+                .collect(Collectors.toList());
+
+        // CompletableFuture들이 모두 완료될 때까지 대기한다.
+        CompletableFuture<Void> allOf = CompletableFuture.allOf(futures.toArray(new CompletableFuture[0]));
+
+        try {
+            allOf.get(); // 모든 작업이 완료될 때까지 대기한다.
+        } catch (InterruptedException | ExecutionException e) {
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Error occurred during execution: " + e.getMessage());
+            return null;
+        }
+
+        // 발생한 암호화 오류 횟수를 포맷팅하여 반환한다.
+        DecimalFormat df = new DecimalFormat("###,###");
+        return df.format(errCount.get());
+    }
+
 //	@ResponseBody
 //	@GetMapping("/getServerDetailInfo")
 //	public String getServerDetailInfo(ServerVO vo) {
@@ -135,7 +244,7 @@ public class LinuxController {
 				}
 				serverCount++;
 			}
-			String averageMemory = (serverCount != 0) ? String.valueOf(totalMemory / serverCount) : "0";
+			String averageMemory = (serverCount != 0) ? String.format("%.1f", totalMemory / serverCount) : "0";
 
 			return averageMemory;
 		} catch (Exception e) {
@@ -149,8 +258,7 @@ public class LinuxController {
 
 	@ResponseBody
 	@GetMapping("getMemoryUsage")
-	public String getMemoryUsage(@RequestParam("serverSequence") long serverSequence, Model model,
-			RedirectAttributes redirectAttributes) {
+	public String getMemoryUsage(@RequestParam("serverSequence") long serverSequence, Model model, RedirectAttributes redirectAttributes) {
 		try {
 			ServerVO aiServer = serverService.getServerOne(serverSequence, Type.AI);
 			String memoryUsage = String.valueOf(serverService.getCpuUsage(aiServer));
@@ -255,18 +363,22 @@ public class LinuxController {
 		List<String> errorMessages = new ArrayList<>();
 
 		List<ServerVO> aiServers = serverService.getServerList(Type.AI);
+
 		for (ServerVO aiServer : aiServers) {
-			String[] serverInfo = { aiServer.host(), String.valueOf(aiServer.port()) };
-			Module result = serverService.cotest(aiServer, "jco_54");
-			switch (result != null ? result : Module.NULL) {
-			case SUCCESS:
-				successServers.add(aiServer);
-				successMessages.add(Module.getDescription(result, serverInfo));
-				continue;
-			default:
-				failedServers.add(aiServer);
-				errorMessages.add(Module.getDescription(result, serverInfo));
-				break;
+			List<InstanceVO> instances = serverService.getInstanceListToDB(aiServer.host());
+			for (InstanceVO instance : instances) {
+				String[] serverInfo = { aiServer.host(), String.valueOf(aiServer.port()) };
+				Module result = serverService.cotest(aiServer, instance);
+				switch (result != null ? result : Module.NULL) {
+				case SUCCESS:
+					successServers.add(aiServer);
+					successMessages.add(Module.getDescription(result, serverInfo));
+					continue;
+				default:
+					failedServers.add(aiServer);
+					errorMessages.add(Module.getDescription(result, serverInfo));
+					break;
+				}
 			}
 		}
 		if (failedServers.isEmpty()) {
@@ -288,13 +400,13 @@ public class LinuxController {
 
 		String[] serverInfo = { aiServer.host(), String.valueOf(aiServer.port()) };
 
-		Set<InstanceVO> instanceList = serverService.getInstanceListToServer(aiServer);
+		InstanceVO instanceList = serverService.getInstanceListToDB(aiServer.host()).get(0);
 
-		if (instanceList.stream().noneMatch(instance -> instance.instance().equals(instanceName))) {
-			return null;
-		}
+//		if (instanceList.stream().noneMatch(instance -> instance.instance().equals(instanceName))) {
+//			return null;
+//		}
 
-		Module result = serverService.cotest(aiServer, instanceName);
+		Module result = serverService.cotest(aiServer, instanceList);
 
 		model.addAttribute("result", Module.getDescription(result, serverInfo));
 
@@ -316,8 +428,7 @@ public class LinuxController {
 
 		ServerVO aiServer = serverService.getServerOne(serverSequence, Server.Type.AI);
 		String[] serverInfo = { aiServer.host(), String.valueOf(aiServer.port()) };
-		MemberVO member = new MemberVO(memberSequence, company, managerName, userId, null, phoneNumber, email, regDate,
-				authGrade);
+		MemberVO member = new MemberVO(memberSequence, company, managerName, userId, null, phoneNumber, email, regDate, authGrade);
 
 		String message = null;
 		Module result = serverService.startCubeOneModule(aiServer, member);

@@ -30,6 +30,7 @@ dependencies {
 	implementation 'com.jcraft:jsch:0.1.55'
 	implementation group: 'me.saro', name: 'sap-jco-manager', version: '3.0.14.7'
 	implementation group: 'nz.net.ultraq.thymeleaf', name: 'thymeleaf-layout-dialect', version: '2.4.1'
+	implementation 'commons-codec:commons-codec:1.15'
 	//implementation 'com.sap.conn.jco.sapjco3:3.0.11'
 	//implementation group: 'net.sf.jacob-project', name: 'jacob', version: '1.19'
 	//implementation group: 'org.jinterop', name: 'j-interop', version: '3.0.0'

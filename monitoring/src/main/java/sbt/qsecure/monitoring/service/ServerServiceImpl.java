@@ -5,6 +5,7 @@ import static org.hamcrest.CoreMatchers.nullValue;
 import java.sql.SQLException;
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -30,7 +31,13 @@ import org.springframework.transaction.interceptor.TransactionAspectSupport;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import sbt.qsecure.monitoring.checker.AIChecker;
+import sbt.qsecure.monitoring.checker.AIValidator;
+import sbt.qsecure.monitoring.connector.LinuxConfigInitializer;
+import sbt.qsecure.monitoring.connector.LinuxConnector;
+import sbt.qsecure.monitoring.connector.OSConnector;
+import sbt.qsecure.monitoring.connector.OSInitializer;
+import sbt.qsecure.monitoring.connector.WindowsConfigInitializer;
+import sbt.qsecure.monitoring.connector.WindowsConnector;
 import sbt.qsecure.monitoring.constant.Auth.AuthGrade;
 import sbt.qsecure.monitoring.constant.Server;
 import sbt.qsecure.monitoring.constant.Server.Command;
@@ -42,12 +49,6 @@ import sbt.qsecure.monitoring.constant.Server.Type;
 import sbt.qsecure.monitoring.constant.Server.Version;
 import sbt.qsecure.monitoring.mapper.CommandMapper;
 import sbt.qsecure.monitoring.mapper.ServerMapper;
-import sbt.qsecure.monitoring.os.LinuxConnector;
-import sbt.qsecure.monitoring.os.LinuxConfigInitializer;
-import sbt.qsecure.monitoring.os.OSConnector;
-import sbt.qsecure.monitoring.os.OSInitializer;
-import sbt.qsecure.monitoring.os.WindowsConnector;
-import sbt.qsecure.monitoring.os.WindowsConfigInitializer;
 import sbt.qsecure.monitoring.vo.DbSettingVO;
 import sbt.qsecure.monitoring.vo.InstanceVO;
 import sbt.qsecure.monitoring.vo.JcoSettingVO;
@@ -68,7 +69,7 @@ public class ServerServiceImpl implements ServerService {
 	private final ServerMapper serverMapper;
 	private final CommandMapper commandMapper;
 
-	private AIChecker checker = new AIChecker();
+	private AIValidator vali = new AIValidator();
 
 	/**
 	 * 서버 유형에 따라 서버 목록을 반환한다.
@@ -126,8 +127,8 @@ public class ServerServiceImpl implements ServerService {
 	 * @return 명령 시도 후 성공 여부
 	 */
 	@Override
-	public Module startCubeOneInstance(ServerVO server, MemberVO member, String instance) {
-		if (!checker.isAdmin(member.authGrade())) {
+	public Module startCubeOneInstance(ServerVO server, MemberVO member, String instanceDirectory) {
+		if (!vali.isAdmin(member.authGrade())) {
 			return Module.ERR_NOAUTH;
 		}
 
@@ -137,28 +138,24 @@ public class ServerServiceImpl implements ServerService {
 		}
 
 		try {
-			String command = Linux.STARTINSTANCE.build(instance);
+			String command = Linux.STARTINSTANCE.build(instanceDirectory);
 			String result = osConnector.sendCommand(command);
-			Module module = null;
-			if (checker.isWrongPath(result)) {
 
+			if (vali.isWrongPath(result)) {
 				return Module.ERR_WRONGPATH_INST;
 			}
 
-			if (checker.isAlreadyRunning(result)) {
+			if (vali.isAlreadyRunning(result)) {
 				return Module.ALREADY_RUN;
 			}
 
-			if (!checker.isStartInstance(result)) {
+			if (!vali.isStartInstance(result)) {
 				return Module.ERR_INSTANCE_CONTROLL;
 			}
 
 		} catch (Exception e) {
-			log.error(Log.STARTINSTANCE.error(instance, member.managerName(), member.authGrade(), server.host()));
 			return Module.ERR_INSTANCE_CONTROLL;
 		}
-
-		log.info(Log.STARTINSTANCE.success(instance, member.managerName(), member.authGrade(), server.host()));
 
 		return Module.SUCCESS;
 	}
@@ -172,41 +169,34 @@ public class ServerServiceImpl implements ServerService {
 	 * @return 명령 시도 후 성공여부 결과 상수
 	 */
 	@Override
-	public Module stopCubeOneInstance(ServerVO server, MemberVO member, String instance) {
-		if (!checker.isAdmin(member.authGrade())) {
+	public Module stopCubeOneInstance(ServerVO server, MemberVO member, String instanceDirectory) {
+		if (!vali.isAdmin(member.authGrade())) {
 			return Module.ERR_NOAUTH;
 		}
-//		String instance = "jco_54";
+
 		OSConnector osConnector = getOSConnector(server);
+		if (osConnector == null) {
+			return Module.ERR_UNKNOWNOS;
+		}
+		
+		try {
+			String command = Linux.STOPINSTANCE.build(instanceDirectory);
+			String result = osConnector.sendCommand(command);
 
-		if (osConnector != null) {
-			try {
-				String command = Linux.STARTINSTANCE.build(instance);
-				String result = osConnector.sendCommand(command);
+			if (vali.isWrongPath(result)) {
+				return Module.ERR_WRONGPATH_INST;
+			}
+			if (vali.isNotRunning(result)) {
+				return Module.NOT_RUNNING;
+			}
 
-				if (checker.isWrongPath(result)) {
-//					log.warn(Server.Log.STOPINSTANCE.error(instance, member.managerName(), member.authGrade(),
-//							server.host(), Server.Module.ERR_WRONGPATH.toString()));
-					return Module.ERR_WRONGPATH_INST;
-				}
-				if (checker.isNotRunning(result)) {
-					return Module.NOT_RUNNING;
-				}
-
-				if (!checker.isStopInstance(result)) {
-//						log.warn(Server.Log.STOPINSTANCE.error(instance, member.managerName(), member.authGrade(),
-//								server.host(), Server.Module.ERR_INSTANCE_CONTROLL.toString()));
-					return Module.ERR_INSTANCE_CONTROLL;
-				}
-
-			} catch (Exception e) {
-//				log.error(Server.Log.STOPINSTANCE.error(instance, member.managerName(), member.authGrade(),
-//						server.host(), Server.Module.ERR_INSTANCE_CONTROLL.toString()), e);
+			if (!vali.isStopInstance(result)) {
 				return Module.ERR_INSTANCE_CONTROLL;
 			}
 
+		} catch (Exception e) {
+			return Module.ERR_INSTANCE_CONTROLL;
 		}
-//		log.info(Server.Log.STOPINSTANCE.success(instance, member.managerName(), member.authGrade(), server.host()));
 
 		return Module.SUCCESS;
 	}
@@ -223,7 +213,7 @@ public class ServerServiceImpl implements ServerService {
 		if (member == null || server == null) {
 			return Module.NULL;
 		}
-		if (!checker.isAdmin(member.authGrade())) {
+		if (!vali.isAdmin(member.authGrade())) {
 			return Module.ERR_NOAUTH;
 		}
 		OSConnector osConnector = getOSConnector(server);
@@ -239,15 +229,15 @@ public class ServerServiceImpl implements ServerService {
 				return Module.ERR_MODULE_CONTROLL;
 			}
 
-			if (checker.isWrongPath(result)) {
+			if (vali.isWrongPath(result)) {
 				return Module.ERR_WRONGPATH_MODULE;
 			}
 
-			if (checker.isAlreadyRunning(result)) {
+			if (vali.isAlreadyRunning(result)) {
 				return Module.ALREADY_RUN;
 			}
 
-			if (!checker.isStartModule(result)) {
+			if (!vali.isStartModule(result)) {
 //					log.info(Server.Log.STARTMODULE.error(member.managerName(), member.authGrade(), server.host()));
 				return Module.ERR_MODULE_CONTROLL;
 			}
@@ -269,7 +259,7 @@ public class ServerServiceImpl implements ServerService {
 	 */
 	@Override
 	public Module stopCubeOneModule(ServerVO server, MemberVO member) {
-		if (!checker.isAdmin(member.authGrade())) {
+		if (!vali.isAdmin(member.authGrade())) {
 			return Module.ERR_NOAUTH;
 		}
 		OSConnector osConnector = getOSConnector(server);
@@ -284,14 +274,14 @@ public class ServerServiceImpl implements ServerService {
 			if (result == null) {
 				return Module.ERR_MODULE_CONTROLL;
 			}
-			if (checker.isWrongPath(result)) {
+			if (vali.isWrongPath(result)) {
 				return Module.ERR_WRONGPATH_MODULE;
 			}
-			if (checker.isNotRunning(result)) {
+			if (vali.isNotRunning(result)) {
 				return Module.NOT_RUNNING;
 			}
 
-			if (!checker.isStopModule(result)) {
+			if (!vali.isStopModule(result)) {
 				return Module.ERR_MODULE_CONTROLL;
 			}
 		} catch (Exception e) {
@@ -401,7 +391,7 @@ public class ServerServiceImpl implements ServerService {
 				String getProcess = Linux.GETPROCESS.build(sortType);
 				String result = osConnector.sendCommand(getProcess);
 
-				if (!checker.isWrongPath(result)) {
+				if (!vali.isWrongPath(result)) {
 					String[] lines = result.split("\n");
 
 					for (String line : lines) {
@@ -510,7 +500,7 @@ public class ServerServiceImpl implements ServerService {
 	 * @param server    서버 정보
 	 * @param directory enc_event_log의 디렉토리
 	 * @param date      enc_event_log의 날짜
-	 * @return enc_event_log의 암호화 중 ERROR 건 수를 포맷된 문자열로 반환한다. (콤마로 천 단위 구분)
+	 * @return enc_event_log의 암호화 ERROR 건 수를 포맷된 문자열로 반환한다. (콤마로 천 단위 구분)
 	 */
 	@Override
 	public String getCountEncError(ServerVO server, String directory, String date) {
@@ -527,7 +517,7 @@ public class ServerServiceImpl implements ServerService {
 
 				// 만약에 잘못된 디렉토리 또는 없는 파일이라면 공백이나 NULL을 반환받았기 때문에
 				// 0을 리턴한다.
-				if (checker.isWrongPath(result)) {
+				if (vali.isWrongPath(result)) {
 					return String.valueOf(encErrorCount);
 				}
 
@@ -537,7 +527,7 @@ public class ServerServiceImpl implements ServerService {
 					log.error("[getCountEncError] Unexpected result format: {}", result);
 					return null;
 				}
-				if (!checker.isNumeric(resultTokens[0])) {
+				if (!vali.isNumeric(resultTokens[0])) {
 					log.error("[getCountEncError] Non-numeric value received: {}", resultTokens[0]);
 					return null;
 				}
@@ -553,8 +543,8 @@ public class ServerServiceImpl implements ServerService {
 			}
 
 		}
-		DecimalFormat df = new DecimalFormat("###,###");
-		return df.format(encErrorCount);
+//		DecimalFormat df = new DecimalFormat("###,###");
+		return String.valueOf(encErrorCount);
 	}
 
 	/**
@@ -563,9 +553,7 @@ public class ServerServiceImpl implements ServerService {
 	 * @param server    서버 정보
 	 * @param directory enc_event_log의 디렉토리
 	 * @param date      enc_event_log의 날짜
-	 * @param sid       복호화를 실행한 SAP SID
-	 * @param conv      복호화 Conv.exit
-	 * @return enc_event_log의 복호화 중 ERROR 건 수
+	 * @return enc_event_log의 복호화 ERROR 건 수를 포맷된 문자열로 반환한다. (콤마로 천 단위 구분)
 	 */
 	@Override
 	public String getCountDecError(ServerVO server, String directory, String date) {
@@ -578,7 +566,7 @@ public class ServerServiceImpl implements ServerService {
 				String command = Linux.COUNT_DEC_ERR.build(directory, date);
 				String result = osConnector.sendCommand(command);
 
-				if (checker.isWrongPath(result)) {
+				if (vali.isWrongPath(result)) {
 					return String.valueOf(decErrorCount);
 				}
 				String[] resultTokens = result.trim().split("\\s+");
@@ -586,7 +574,7 @@ public class ServerServiceImpl implements ServerService {
 					log.error("[getCountDecError] Unexpected result format: {}", result);
 					return null;
 				}
-				if (!checker.isNumeric(resultTokens[0])) {
+				if (!vali.isNumeric(resultTokens[0])) {
 					log.error("[getCountDecError] Non-numeric value received: {}", resultTokens[0]);
 					return null;
 				}
@@ -606,29 +594,39 @@ public class ServerServiceImpl implements ServerService {
 		return df.format(decErrorCount);
 	}
 
+	/**
+	 * 암호화서버에서 모듈테스트, SAP연결테스트, DB테스트를 진행한다.
+	 * 
+	 * @param server 테스트를 진행할 인스턴스가 있는 서버
+	 * @param instance 테스트를 진행할 인스턴스
+	 * @return 테스트의 결과 상수
+	 */
 	@Override
-	public Module cotest(ServerVO server, String instance) {
+	public Module cotest(ServerVO server, InstanceVO instance) {
+		
 		OSConnector osConnector = getOSConnector(server);
-
+		//테스트를 진행할 명령어 목록을 배열에 담는다.
 		String[] checks = { "enc", "sap", "db" };
-		String[] serverInfo = { server.host(), String.valueOf(server.port()) };
-		String path = "aisvr/" + instance;
-		path = checker.addMissingFlash(path);
+		
+		//사용자가 입력한 디렉토리의 구분자를 확인한다
+		String directory = vali.addMissingFlash(instance.directory());
+		String[] serverInfo = { server.host(), String.valueOf(server.port()), instance.instance().toUpperCase() };
+
 		for (String type : checks) {
 			try {
-				String command = Linux.COTEST.build(path, type);
+				String command = Linux.COTEST.build(directory, type);
 				String result = osConnector.sendCommand(command);
 
 				if (result != null) {
 
-					if (checker.isSuccess(result)) {
-
+					if (vali.isSuccess(result)) {
+						log.info(Log.COTEST.success(type, instance.instance()));
 						continue;
 
-					} else if (checker.isWrongPath(result)) {
+					} else if (vali.isWrongPath(result)) {
 
-						log.info(Module.getDescription(Module.ERR_WRONGPATH_INST, server.host(),
-								String.valueOf(server.port()), command.replace(type, "")));
+						log.info(Module.getDescription(Module.ERR_WRONGPATH_INST, new String[] { server.host(),
+								String.valueOf(server.port()), instance.instance(), instance.directory() }));
 
 						return Module.ERR_WRONGPATH_INST;
 					}
@@ -644,13 +642,13 @@ public class ServerServiceImpl implements ServerService {
 
 					case "db":
 						log.info("retry db");
-						Module dbResult = retryConnectDb(osConnector, path);
+						Module dbResult = retryConnectDb(osConnector, directory);
 
 						if (dbResult.equals(Module.SUCCESS)) {
 							return dbResult;
 						}
 
-						log.warn(Module.getDescription(Module.ERR_AIDB_TEST, serverInfo));
+						log.warn("[cotest] " + Module.getDescription(Module.ERR_AIDB_TEST, serverInfo));
 
 						return dbResult;
 					}
@@ -664,12 +662,12 @@ public class ServerServiceImpl implements ServerService {
 	}
 
 	private Module retryConnectDb(OSConnector osConnector, String path) {
-		path = this.checker.addMissingFlash(path);
+		path = this.vali.addMissingFlash(path);
 		try {
 			String command = Linux.COTEST.retry(path);
 			String result = osConnector.sendCommand(command);
 
-			if (checker.isSuccess(result)) {
+			if (vali.isSuccess(result)) {
 				return Module.SUCCESS;
 			}
 			return Module.ERR_AIDB_TEST;
@@ -685,20 +683,27 @@ public class ServerServiceImpl implements ServerService {
 
 		Set<InstanceVO> instances = new HashSet<>();
 		try {
+
+			String[] homeToken = osConnector.sendCommand(Linux.GETCOHOME.build()).trim().split("\\s");
+			String coHome = homeToken[0];
+			String directory = null;
+
 			Version version = getModuleVersionToDB(server.host(), Type.AI);
+
 			String command = Linux.GETINSTANCELIST.build(version);
-			String cohome = osConnector.sendCommand("source .bash_profile;pwd $COHOME");
-			String[] homeToken = cohome.trim().split("\\s");
-			String home = homeToken[0];
 			String result = osConnector.sendCommand(command);
 			String[] lines = result.split("\\r?\\n");
 
 			for (String line : lines) {
-				if (checker.isDirectory(line)) {
+				if (vali.isDirectory(line)) {
 					String[] parts = line.split("\\s+");
 					if (parts.length > 8) {
 						String instance = parts[8];
-						instances.add(new InstanceVO(server.host(), instance, home));
+						switch (version) {
+						case NEW -> directory = coHome + "/aisvr/" + instance;
+						case OLD -> directory = coHome + "/JCOCubeOneServer/" + instance;
+						}
+						instances.add(new InstanceVO(server.host(), instance, directory));
 					}
 				}
 			}
@@ -724,13 +729,7 @@ public class ServerServiceImpl implements ServerService {
 	@Override
 	public JcoSettingVO getInstanceJcoSettingFromServer(ServerVO server, String instance) throws Exception {
 
-		String connectionCount = null;
-		String gwHost = null;
-		String progId = null;
-		String gwPort = null;
-		String repositoryDestination = null;
-		String workerThreadCount = null;
-
+		Map<String, String> jcoSettings = new HashMap<>();
 		OSConnector osConnector = getOSConnector(server);
 		Version version = getModuleVersionToDB(server.host(), Type.AI);
 		String command = Linux.GETJCOSETTING.build(version, instance);
@@ -750,30 +749,22 @@ public class ServerServiceImpl implements ServerService {
 
 			Matcher matcher = pattern.matcher(key);
 			if (matcher.find()) {
-//				String jcoPart = matcher.group(1);
 				String extractedKey = matcher.group(2);
-
-				switch (extractedKey) {
-				case "connection_count" -> connectionCount = value;
-				case "gwhost" -> gwHost = value;
-				case "progid" -> progId = value;
-				case "gwserv" -> gwPort = value;
-				case "repository_destination" -> repositoryDestination = value;
-				case "worker_thread_count" -> workerThreadCount = value;
-				}
-				;
+				jcoSettings.put(extractedKey, value);
 			}
 		}
-		try {
-			checker.requireNonNullParams(connectionCount, gwHost, progId, gwPort, repositoryDestination,
-					workerThreadCount);
-		} catch (NullPointerException e) {
-			e.printStackTrace();
-			return null;
+		String[] notNullParams = { "connection_count", "gwhost", "progid", "gwserv", "repository_destination",
+				"worker_thread_count" };
+		for (String param : notNullParams) {
+			if (!jcoSettings.containsKey(param)) {
+				throw new NullPointerException(
+						"[getInstanceJcoSettingFromServer] JCO Missing required parameter: " + param);
+			}
 		}
 
-		return new JcoSettingVO(server.host(), instance, connectionCount, gwHost, progId, gwPort, repositoryDestination,
-				workerThreadCount);
+		return new JcoSettingVO(server.host(), instance, jcoSettings.get("connection_count"), jcoSettings.get("gwhost"),
+				jcoSettings.get("progid"), jcoSettings.get("gwserv"), jcoSettings.get("repository_destination"),
+				jcoSettings.get("worker_thread_count"));
 	}
 
 	@Override
@@ -792,26 +783,9 @@ public class ServerServiceImpl implements ServerService {
 	@Override
 	public DbSettingVO getInstanceDbSettingFromServer(@Param("host") ServerVO server, String instance)
 			throws Exception {
+		Map<String, String> dbSettings = new HashMap<>();
 
 		OSConnector osConnector = getOSConnector(server);
-
-		String ip = null;
-		String indicator = null;
-		String port = null;
-		String encLogFile = null;
-		String userId = null;
-		String logFile = null;
-		String db = null;
-		String encLog = null;
-		String maxPoolSize = null;
-		String item = null;
-		String log = null;
-		String dbName = null;
-		String password = null;
-		String oldVersion = null;
-		String difTab = null;
-		String oldApi = null;
-		String fixUser = null;
 
 		Version version = getModuleVersionToDB(server.host(), Type.AI);
 		String command = Linux.GETDBSETTING.build(version, instance);
@@ -828,37 +802,24 @@ public class ServerServiceImpl implements ServerService {
 			String key = parts[0].trim();
 			String value = parts[1].trim();
 
-			switch (key.toLowerCase().replaceAll("[^a-zA-Z0-9]", "")) {
-			case "ip" -> ip = value;
-			case "indicator" -> indicator = value;
-			case "port" -> port = value;
-			case "enclogfile" -> encLogFile = value;
-			case "userid" -> userId = value;
-			case "logfile" -> logFile = value;
-			case "db" -> db = value;
-			case "enclog" -> encLog = value;
-			case "maxpoolsize" -> maxPoolSize = value;
-			case "item" -> item = value;
-			case "log" -> log = value;
-			case "dbname" -> dbName = value;
-			case "password" -> password = value;
-			case "oldversion" -> oldVersion = value;
-			case "diftab" -> difTab = value;
-			case "oldapi" -> oldApi = value;
-			case "fixuser" -> fixUser = value;
+			dbSettings.put(key.toLowerCase().replaceAll("[^a-zA-Z0-9]", ""), value);
+		}
+
+		String[] notNullParams = { "ip", "indicator", "port", "enclogfile", "userid", "logfile", "db", "enclog",
+				"maxpoolsize", "item", "log", "dbname", "password" };
+		for (String param : notNullParams) {
+			if (!dbSettings.containsKey(param)) {
+				throw new NullPointerException(
+						"[getInstanceDbSettingFromServer] DB Setting Missing required parameter: " + param);
 			}
 		}
 
-		try {
-			checker.requireNonNullParams(indicator, encLogFile, userId, logFile, db, encLog, maxPoolSize, item, log,
-					dbName, password);
-		} catch (NullPointerException e) {
-			e.printStackTrace();
-			return null;
-		}
-
-		return new DbSettingVO(server.host(), instance, ip, indicator, port, encLogFile, userId, logFile, db, encLog,
-				maxPoolSize, item, log, dbName, password, oldVersion, difTab, oldApi, fixUser);
+		return new DbSettingVO(server.host(), instance, dbSettings.get("ip"), dbSettings.get("indicator"),
+				dbSettings.get("port"), dbSettings.get("enclogfile"), dbSettings.get("userid"),
+				dbSettings.get("logfile"), dbSettings.get("db"), dbSettings.get("enclog"),
+				dbSettings.get("maxpoolsize"), dbSettings.get("item"), dbSettings.get("log"), dbSettings.get("dbname"),
+				dbSettings.get("password"), dbSettings.get("oldversion"), dbSettings.get("diftab"),
+				dbSettings.get("oldapi"), dbSettings.get("fixuser"));
 
 	}
 
@@ -936,14 +897,7 @@ public class ServerServiceImpl implements ServerService {
 				;
 			}
 		}
-		// 필수 설정 값이 모두 존재하는지 확인한다
-		try {
-			checker.requireNonNullParams(lang, client, peakLimit, passwd, user, sysnr, poolCapacity, asHost);
-		} catch (NullPointerException e) {
-			// 필수 설정 값이 존재하지 않는 경우 예외처리
-			e.printStackTrace();
-			return null;
-		}
+	
 		// SAP 설정 VO를 반환한다
 		return new SapSettingVO(server.host(), instance, lang, client, peakLimit, passwd, user, sysnr, poolCapacity,
 				asHost);
