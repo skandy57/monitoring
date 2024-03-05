@@ -1,4 +1,4 @@
-package sbt.qsecure.monitoring.os;
+package sbt.qsecure.monitoring.connector;
 
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketHandler;

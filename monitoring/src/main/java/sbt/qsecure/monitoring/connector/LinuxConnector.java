@@ -1,4 +1,4 @@
-package sbt.qsecure.monitoring.os;
+package sbt.qsecure.monitoring.connector;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;
@@ -174,7 +174,8 @@ public class LinuxConnector implements OSConnector {
 					String line;
 
 					while ((line = reader.readLine()) != null) {
-						result.append(line).append(System.lineSeparator());
+
+						result.append(line.trim()).append(System.lineSeparator());
 
 						if (Thread.currentThread().isInterrupted()) {
 							log.warn("[sendCommand] Input stream reading thread interrupted.");
@@ -186,7 +187,7 @@ public class LinuxConnector implements OSConnector {
 							break;
 						}
 					}
-					return result.toString();
+					return result.toString().trim();
 				} catch (IOException e) {
 					log.error("[sendCommand] Exception while reading input stream: " + command);
 					return null;
@@ -195,6 +196,7 @@ public class LinuxConnector implements OSConnector {
 
 			try {
 				result.append(future.get(5, TimeUnit.SECONDS));
+//				future.get(5, TimeUnit.SECONDS);
 			} catch (TimeoutException e) {
 				future.cancel(true);
 				log.warn("[sendCommand] Task execution timed out.");
@@ -225,10 +227,7 @@ public class LinuxConnector implements OSConnector {
 			}
 
 		}
-//		String[] resultTokens = result.toString().trim().split("\\s");
-
 		return result.toString();
-//		return resultTokens[0];
 
 	}
 

@@ -19,11 +19,11 @@ public class SettingServiceImpl implements SettingService{
 	private final SettingMapper settingMapper;
 	
 	
-	@Override
-	public List<ConvExitVO> getConvExitList() {
-
-		return settingMapper.getConvExitList();
-	}
+//	@Override
+//	public List<ConvExitVO> getConvExitList() {
+//
+//		return settingMapper.getConvExitList();
+//	}
 
 //	@Override
 //	public List<CommonSettingVO> getCommonSettingList() {

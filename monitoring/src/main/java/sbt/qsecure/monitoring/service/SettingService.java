@@ -7,6 +7,6 @@ import sbt.qsecure.monitoring.vo.ConvExitVO;
 
 @Service
 public interface SettingService {
-	public List<ConvExitVO> getConvExitList();
+//	public List<ConvExitVO> getConvExitList();
 //	public List<CommonSettingVO> getCommonSettingList();
 }

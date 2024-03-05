@@ -15,4 +15,6 @@ public record ServerVO(
 		String version,
 		String coHome
 )
-{}
+{
+
+}

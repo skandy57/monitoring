@@ -91,7 +91,7 @@ public interface ServerService {
 
 	public Module stopCubeOneModule(ServerVO server, MemberVO member);
 
-	public Module cotest(ServerVO server, String instance);
+	public Module cotest(ServerVO server, InstanceVO instance);
 
 	public String getTop();
 

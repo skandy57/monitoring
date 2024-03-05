@@ -2,10 +2,10 @@ package sbt.qsecure.monitoring.constant;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
-import sbt.qsecure.monitoring.checker.AIChecker;
+import sbt.qsecure.monitoring.checker.AIValidator;
 
 /**
- * 암호화 서버 정의 상수
+ * 암호화 관련 서버들의 정의 상수
  */
 public enum Server {
 	;
@@ -20,25 +20,25 @@ public enum Server {
 		 * 암호화 SAP 통신 테스트간 에러발생
 		 */
 		ERR_SAP_TEST(
-				"[%s:%s] An error occurred during encryption SAP communication testing. Please check the firewall between A/I and SAP."),
+				"[%s:%s-%s] An error occurred during encryption SAP communication testing. Please check the A/I Server's and SAP or Check the Setting Value of the SAP Setting File"),
 		/**
 		 * 암호화 DB 통신 테스트간 에러발생
 		 */
 		ERR_AIDB_TEST(
-				"[%s:%s] An error occurred during encryption DB communication testing. Please check the A/I server's DB settings or firewall."),
+				"[%s:%s-%s] An error occurred during encryption DB communication testing. Please check the A/I Server's And DB's firewall or Check the Setting Value of the DB Setting File."),
 		/**
 		 * 암호화 모듈 테스트간 에러발생
 		 */
 		ERR_MODULE_TEST(
-				"[%s:%s] An error occurred during encryption module testing. Please check the A/I module Running."),
+				"[%s:%s-%s] An error occurred during encryption module testing. Please check the A/I module Running."),
 		/**
-		 * WAS에 등록된 암호화 인스턴스 경로가 틀림 
+		 * WAS에 등록된 암호화 인스턴스 경로가 틀림
 		 */
-		ERR_WRONGPATH_INST("[%s:%s] modify the encryption instance path. %s"),
+		ERR_WRONGPATH_INST("[%s:%s-%s] Please modify the encryption instance path. %s"),
 		/**
 		 * WAS에 등록된 암호화 모듈 경로가 틀림
 		 */
-		ERR_WRONGPATH_MODULE("[%s:%s] modify the encryption module path. %s"),
+		ERR_WRONGPATH_MODULE("[%s:%s-%s] Please modify the encryption module path. %s"),
 		/**
 		 * 권한 없는 유저가 제어를 시도함
 		 */
@@ -46,11 +46,11 @@ public enum Server {
 		/**
 		 * 모듈 조작간 에러가 발생함
 		 */
-		ERR_MODULE_CONTROLL("[%s:%s] an error occurred during module control"),
+		ERR_MODULE_CONTROLL("[%s:%s-%s] an error occurred during module control"),
 		/**
 		 * 인스턴스 조작간 에러가 발생함
 		 */
-		ERR_INSTANCE_CONTROLL("[%s:%s] error occurred during encryption instance %s control."),
+		ERR_INSTANCE_CONTROLL("[%s:%s-%s] error occurred during encryption instance %s control."),
 		/**
 		 * WAS에 등록된 암호화 서버 OS가 오타거나 잘못입력함
 		 */
@@ -59,11 +59,11 @@ public enum Server {
 		/**
 		 * COTEST간 오류가 발생함
 		 */
-		ERR_COTEST("[%s:%s] COTEST error occurred. Please check the network between WAS and A/I."),
+		ERR_COTEST("[%s:%s-%s] COTEST error occurred. Please check the network between WAS and A/I."),
 		/**
 		 * 암호화 서버와 통신간 NULL값을 리턴받음
 		 */
-		NULL("[%s:%s] COTEST error occurred. Please check the network between WAS and A/I."),
+		NULL("[%s:%s-%s] COTEST error occurred. Please check the network between WAS and A/I."),
 		/**
 		 * 기동되지 않은 모듈이나 인스턴스를 중지를 시도함
 		 */
@@ -83,6 +83,10 @@ public enum Server {
 			return String.format(description, trimmedArgs);
 		}
 
+		public String getDescription() {
+			return this.description;
+		}
+
 		public static String getDescription(Module module, String... args) {
 			Object[] trimmedArgs = new String[args.length];
 			for (int i = 0; i < args.length; i++) {
@@ -90,6 +94,12 @@ public enum Server {
 			}
 			return String.format(module.getDescription(), trimmedArgs);
 		}
+
+	}
+
+	@Getter
+	@RequiredArgsConstructor
+	public enum SecurityServer {
 
 	}
 
@@ -174,14 +184,30 @@ public enum Server {
 
 			@Override
 			public String success(String... args) {
-				// TODO Auto-generated method stub
-				return null;
+				String cotestType = args[0];
+				String instanceName = args[1].toUpperCase();
+
+				return switch (cotestType) {
+				case "enc" ->
+					log("[cotest] Success %s Encrypt Module TEST, continue SAP Connection Test.....", instanceName);
+				case "sap" ->
+					log("[cotest] Success %s SAP Connection Test, continue DB Connection Test.....", instanceName);
+				case "db" -> log("[cotest] Success %s DB Connection Test, ALL TEST SUCCESS.....", instanceName);
+				default -> null;
+				};
 			}
 
 			@Override
 			public String error(String... args) {
-				// TODO Auto-generated method stub
-				return null;
+				String cotestType = args[0];
+				String instanceName = args[1];
+
+				return switch (cotestType) {
+				case "enc" -> log("[cotest] Fail %s Encrypt Module TEST", instanceName);
+				case "sap" -> log("[cotest] Fail %s SAP Connection Test", instanceName);
+				case "db" -> log("[cotest] Fail %s DB Connection Test", instanceName);
+				default -> null;
+				};
 			}
 
 //			public String error(Server.Module result, String... args) {
@@ -449,26 +475,26 @@ public enum Server {
 	}
 
 	/**
-	 * OS 명령어들의 상수 ENUM
+	 * 암호화 관련 서버들을 제어하기 위한 명령어들의 상수 ENUM
 	 */
 	public enum Command {
 		;
 
 		/**
-		 * 리눅스 명령어들의 상수 ENUM
+		 * 리눅스 OS를 사용하는 서버들의 명령어들의 상수 ENUM
 		 */
 		public enum Linux {
 
 			COTEST {
 				@Override
 				public String build(String... args) {
-					AIChecker checker = new AIChecker();
+					AIValidator checker = new AIValidator();
 
 					if (args[0] != null && args[1] != null) {
 						String directory = checker.addMissingFlash(args[0]);
 						String type = args[1];
 
-						return String.format(BASH.build() + "$COHOME%scotest.sh %s", directory, type);
+						return String.format(BASH.build() + "%scotest.sh %s", directory, type);
 					}
 					return null;
 				}
@@ -476,16 +502,16 @@ public enum Server {
 				@Override
 				public String retry(String directory) {
 
-					AIChecker checker = new AIChecker();
+					AIValidator checker = new AIValidator();
 
 					directory = checker.addMissingFlash(directory);
 
-					return String.format(BASH.build() + "$COHOME%scotest.sh ora", directory);
+					return String.format(BASH.build() + "%scotest.sh ora", directory);
 				}
 
 			},
 			/**
-			 * 환경변수를 사용하기 위해 bash_profile을 source처리한다. 
+			 * 환경변수를 사용하기 위해 bash_profile을 source처리한다.
 			 */
 			BASH {
 				@Override
@@ -500,14 +526,12 @@ public enum Server {
 				@Override
 				public String build(String... args) {
 
-					AIChecker checker = new AIChecker();
-					if (args[0] != null && args[1] != null ) {
+					AIValidator checker = new AIValidator();
+					if (args[0] != null && args[1] != null) {
 						String directory = checker.addMissingFlash(args[0]);
 						String date = args[1];
-						
 
-						return String.format(BASH.build()
-								+ "grep -c '[ERROR]' $COHOME%s%s_*_ENC_* | awk -F: '{sum += $NF}END {print sum}'",
+						return String.format("grep -c '[ERROR]' %s%s_*_ENC_* | awk -F: '{sum += $NF}END {print sum}'",
 								directory, date);
 					}
 					return null;
@@ -520,7 +544,7 @@ public enum Server {
 			COUNT_DEC_ERR {
 				@Override
 				public String build(String... args) {
-					AIChecker checker = new AIChecker();
+					AIValidator checker = new AIValidator();
 					String directory = checker.addMissingFlash(args[0]);
 					String date = args[1];
 					String sid = args[2];
@@ -593,7 +617,7 @@ public enum Server {
 
 				@Override
 				public String build(String... args) {
-					AIChecker checker = new AIChecker();
+					AIValidator checker = new AIValidator();
 					if (args[0] != null) {
 						String directory = checker.addMissingFlash(args[0]);
 
@@ -623,7 +647,7 @@ public enum Server {
 			STOPINSTANCE {
 				@Override
 				public String build(String... args) {
-					AIChecker checker = new AIChecker();
+					AIValidator checker = new AIValidator();
 					if (args[0] != null) {
 						String directory = checker.addMissingFlash(args[0]);
 
@@ -634,14 +658,16 @@ public enum Server {
 							e.printStackTrace();
 						}
 
-						return String.format(BASH.build() + "$COHOME%scubeone_%s.sh stop", directory, instance);
+						return String.format("%scubeone_%s.sh stop", directory, instance);
 					}
 					return null;
 				}
 			},
 			/**
-			 * 암호화 서버의 프로세스 목록을 추출하는 명령어를 조합한다.<p>
-			 * 기본 정렬은 cpu 사용량 상위 11개를 추출하고, 첫번째 매개변수를 mem 또는 cpu로 지정한 이후,<p>
+			 * 암호화 서버의 프로세스 목록을 추출하는 명령어를 조합한다.
+			 * <p>
+			 * 기본 정렬은 cpu 사용량 상위 11개를 추출하고, 첫번째 매개변수를 mem 또는 cpu로 지정한 이후,
+			 * <p>
 			 * 그 다음 매개변수로 추출하고자 하는 갯수를 문자열로 받아 명령어를 조합하여 리턴한다.
 			 */
 			GETPROCESS {
@@ -788,18 +814,18 @@ public enum Server {
 			/**
 			 * 암호화 서버의 환경변수인 COHOME의 경로를 구하는 명령어
 			 */
-			GETCOHOME{
+			GETCOHOME {
 
 				@Override
 				public String build(String... args) {
 
-					return BASH.build()+"pwd $COHOME";
+					return BASH.build() + "pwd $COHOME";
 				}
-				
+
 			},
-			
+
 			/**
-			 * 암호화 구형 모듈의 인스턴스 디렉토리 
+			 * 암호화 구형 모듈의 인스턴스 디렉토리
 			 */
 			OLD {
 
@@ -901,35 +927,20 @@ public enum Server {
 			/**
 			 * 시스템 기동시간
 			 */
-			SYSTEM_UPTIME("1.3.6.1.1.2.1.1.3"), 
-			INTERFACE_NAME("1.3.6.1.2.1.2.2.1.2"),
-			INTERFACE_TYPE("1.3.6.1.2.1.2.2.1.2"), 
-			INTERFACE_MTU("1.3.6.1.2.1.2.2.1.4"),
-			INTERFACE_SPEED("1.3.5.1.2.1.2.2.1.5"), 
-			INTERFACE_MACADDRESS("1.3.5.1.2.1.2.2.1.6"),
-			IP_DEFAULT_TTL("1.3.5.1.2.1.4.2"), 
-			INTERFACE_IP("1.3.5.1.2.1.4.20.1.1"),
-			INTERFACE_NETMASK("1.3.6.1.2.1.4.20.1.3"), 
-			HW_UPTIME("1.3.6.1.2.1.25.1.1"), 
-			HW_TIME("1.3.6.1.2.1.25.1.2"),
-			NETWORK_DEVICE_INFO("1.3.6.1.2.1.25.3.4"), 
-			CPU_USAGE_1MIN("1.3.6.1.4.1.2021.10.1.3.1"),
-			CPU_USAGE_5MIN("1.3.6.1.4.1.s2021.10.1.3.2"), 
-			CPU_USAGE_15MIN("1.3.6.1.4.1.2021.10.1.3.3"),
-			CPU_SYSTEM_TIME("1.3.6.1.4.1.2021.11.52.0"), 
-			CPU_IDLE_TIME("1.3.6.1.4.1.2021.11.53.0"),
-			DISK_INFO("1.3.6.1.2.1.25.2.3.1.3"), 
-			DISK_TYPE("1.3.6.1.2.1.25.2.3.1.2"),
-			DISK_TOTAL("1.3.6.1.2.1.25.2.3.1.5"), 
-			DISK_USED("1.3.6.1.2.1.25.2.3.1.6"),
-			SWAP_TOTAL("1.3.6.1.4.1.2021.4.1.3"), 
-			SWAP_FREE("1.3.6.1.4.1.2021.4.1.4"),
-			PHYSICAL_TOTAL("1.3.6.1.4.1.2021.4.1.5"), 
-			MEMORY_TOTAL("1.3.6.1.2.1.25.2.2"),
-			PHYSICAL_FREE("1.3.6.1.4.1.2021.4.1.6"), 
-			MEMORY_FREE("1.3.6.1.4.1.2021.4.1.11"),
-			SHARED_MEMORY("1.3.6.1.4.1.2021.4.1.13"), 
-			BUFFER_MEMORY("1.3.6.1.4.1.2021.4.1.14"),
+			SYSTEM_UPTIME("1.3.6.1.1.2.1.1.3"), INTERFACE_NAME("1.3.6.1.2.1.2.2.1.2"),
+			INTERFACE_TYPE("1.3.6.1.2.1.2.2.1.2"), INTERFACE_MTU("1.3.6.1.2.1.2.2.1.4"),
+			INTERFACE_SPEED("1.3.5.1.2.1.2.2.1.5"), INTERFACE_MACADDRESS("1.3.5.1.2.1.2.2.1.6"),
+			IP_DEFAULT_TTL("1.3.5.1.2.1.4.2"), INTERFACE_IP("1.3.5.1.2.1.4.20.1.1"),
+			INTERFACE_NETMASK("1.3.6.1.2.1.4.20.1.3"), HW_UPTIME("1.3.6.1.2.1.25.1.1"), HW_TIME("1.3.6.1.2.1.25.1.2"),
+			NETWORK_DEVICE_INFO("1.3.6.1.2.1.25.3.4"), CPU_USAGE_1MIN("1.3.6.1.4.1.2021.10.1.3.1"),
+			CPU_USAGE_5MIN("1.3.6.1.4.1.s2021.10.1.3.2"), CPU_USAGE_15MIN("1.3.6.1.4.1.2021.10.1.3.3"),
+			CPU_SYSTEM_TIME("1.3.6.1.4.1.2021.11.52.0"), CPU_IDLE_TIME("1.3.6.1.4.1.2021.11.53.0"),
+			DISK_INFO("1.3.6.1.2.1.25.2.3.1.3"), DISK_TYPE("1.3.6.1.2.1.25.2.3.1.2"),
+			DISK_TOTAL("1.3.6.1.2.1.25.2.3.1.5"), DISK_USED("1.3.6.1.2.1.25.2.3.1.6"),
+			SWAP_TOTAL("1.3.6.1.4.1.2021.4.1.3"), SWAP_FREE("1.3.6.1.4.1.2021.4.1.4"),
+			PHYSICAL_TOTAL("1.3.6.1.4.1.2021.4.1.5"), MEMORY_TOTAL("1.3.6.1.2.1.25.2.2"),
+			PHYSICAL_FREE("1.3.6.1.4.1.2021.4.1.6"), MEMORY_FREE("1.3.6.1.4.1.2021.4.1.11"),
+			SHARED_MEMORY("1.3.6.1.4.1.2021.4.1.13"), BUFFER_MEMORY("1.3.6.1.4.1.2021.4.1.14"),
 			CACHE_MEMORY("1.3.6.1.4.1.2021.4.1.15");
 
 			private final String oid;

@@ -1,4 +1,4 @@
-package sbt.qsecure.monitoring.os;
+package sbt.qsecure.monitoring.connector;
 
 import java.util.List;
 import sbt.qsecure.monitoring.constant.Server.OS;
